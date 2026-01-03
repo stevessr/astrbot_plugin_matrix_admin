@@ -10,14 +10,14 @@ from .base import AdminCommandMixin
 
 
 class IgnoreCommandsMixin(AdminCommandMixin):
-    """屏蔽命令: ignore, unignore, ignorelist"""
+    """屏蔽命令：ignore, unignore, ignorelist"""
 
     async def cmd_ignore(self, event: AstrMessageEvent, user: str):
         """屏蔽用户
 
-        用法: /admin ignore <用户ID>
+        用法：/admin ignore <用户 ID>
 
-        示例:
+        示例：
             /admin ignore @annoying:example.com
         """
         client = self._get_matrix_client(event)
@@ -34,15 +34,15 @@ class IgnoreCommandsMixin(AdminCommandMixin):
             await client.ignore_user(user_id)
             yield event.plain_result(f"已屏蔽 {user_id}")
         except Exception as e:
-            logger.error(f"屏蔽用户失败: {e}")
-            yield event.plain_result(f"屏蔽用户失败: {e}")
+            logger.error(f"屏蔽用户失败：{e}")
+            yield event.plain_result(f"屏蔽用户失败：{e}")
 
     async def cmd_unignore(self, event: AstrMessageEvent, user: str):
         """取消屏蔽用户
 
-        用法: /admin unignore <用户ID>
+        用法：/admin unignore <用户 ID>
 
-        示例:
+        示例：
             /admin unignore @user:example.com
         """
         client = self._get_matrix_client(event)
@@ -59,13 +59,13 @@ class IgnoreCommandsMixin(AdminCommandMixin):
             await client.unignore_user(user_id)
             yield event.plain_result(f"已取消屏蔽 {user_id}")
         except Exception as e:
-            logger.error(f"取消屏蔽失败: {e}")
-            yield event.plain_result(f"取消屏蔽失败: {e}")
+            logger.error(f"取消屏蔽失败：{e}")
+            yield event.plain_result(f"取消屏蔽失败：{e}")
 
     async def cmd_ignorelist(self, event: AstrMessageEvent):
         """查看屏蔽列表
 
-        用法: /admin ignorelist
+        用法：/admin ignorelist
         """
         client = self._get_matrix_client(event)
         if not client:
@@ -86,5 +86,5 @@ class IgnoreCommandsMixin(AdminCommandMixin):
             yield event.plain_result("\n".join(lines))
 
         except Exception as e:
-            logger.error(f"获取屏蔽列表失败: {e}")
-            yield event.plain_result(f"获取屏蔽列表失败: {e}")
+            logger.error(f"获取屏蔽列表失败：{e}")
+            yield event.plain_result(f"获取屏蔽列表失败：{e}")

@@ -29,7 +29,7 @@ class AdminCommandMixin:
                     if hasattr(platform, "client"):
                         return platform.client
         except Exception as e:
-            logger.debug(f"获取 Matrix 客户端失败: {e}")
+            logger.debug(f"获取 Matrix 客户端失败：{e}")
 
         return None
 

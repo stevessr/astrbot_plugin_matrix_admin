@@ -43,9 +43,9 @@ class Main(
     async def admin_kick(self, event: AstrMessageEvent, user: str, reason: str = ""):
         """踢出用户
 
-        用法: /admin kick <用户ID> [原因]
+        用法：/admin kick <用户 ID> [原因]
 
-        示例:
+        示例：
             /admin kick @baduser:example.com
             /admin kick @baduser:example.com 违规发言
         """
@@ -56,9 +56,9 @@ class Main(
     async def admin_ban(self, event: AstrMessageEvent, user: str, reason: str = ""):
         """封禁用户
 
-        用法: /admin ban <用户ID> [原因]
+        用法：/admin ban <用户 ID> [原因]
 
-        示例:
+        示例：
             /admin ban @spammer:example.com
             /admin ban @spammer:example.com 垃圾广告
         """
@@ -69,9 +69,9 @@ class Main(
     async def admin_unban(self, event: AstrMessageEvent, user: str):
         """解除封禁
 
-        用法: /admin unban <用户ID>
+        用法：/admin unban <用户 ID>
 
-        示例:
+        示例：
             /admin unban @user:example.com
         """
         async for result in self.cmd_unban(event, user):
@@ -81,9 +81,9 @@ class Main(
     async def admin_invite(self, event: AstrMessageEvent, user: str):
         """邀请用户加入房间
 
-        用法: /admin invite <用户ID>
+        用法：/admin invite <用户 ID>
 
-        示例:
+        示例：
             /admin invite @friend:example.com
         """
         async for result in self.cmd_invite(event, user):
@@ -97,13 +97,13 @@ class Main(
     ):
         """提升用户权限
 
-        用法: /admin promote <用户ID> [级别]
+        用法：/admin promote <用户 ID> [级别]
 
-        级别:
+        级别：
             mod - 管理员 (50)
             admin - 房主 (100)
 
-        示例:
+        示例：
             /admin promote @user:example.com
             /admin promote @user:example.com admin
         """
@@ -114,9 +114,9 @@ class Main(
     async def admin_demote(self, event: AstrMessageEvent, user: str):
         """降低用户权限为普通成员
 
-        用法: /admin demote <用户ID>
+        用法：/admin demote <用户 ID>
 
-        示例:
+        示例：
             /admin demote @user:example.com
         """
         async for result in self.cmd_demote(event, user):
@@ -126,14 +126,14 @@ class Main(
     async def admin_power(self, event: AstrMessageEvent, user: str, level: int):
         """设置用户权限等级
 
-        用法: /admin power <用户ID> <等级>
+        用法：/admin power <用户 ID> <等级>
 
-        等级说明:
+        等级说明：
             0 - 普通成员
             50 - 管理员
             100 - 房主
 
-        示例:
+        示例：
             /admin power @user:example.com 50
         """
         async for result in self.cmd_power(event, user, level):
@@ -143,7 +143,7 @@ class Main(
     async def admin_list_admins(self, event: AstrMessageEvent):
         """列出房间管理员
 
-        用法: /admin admins
+        用法：/admin admins
         """
         async for result in self.cmd_admins(event):
             yield result
@@ -154,9 +154,9 @@ class Main(
     async def admin_whois(self, event: AstrMessageEvent, user: str):
         """查询用户信息
 
-        用法: /admin whois <用户ID>
+        用法：/admin whois <用户 ID>
 
-        示例:
+        示例：
             /admin whois @user:example.com
         """
         async for result in self.cmd_whois(event, user):
@@ -168,9 +168,9 @@ class Main(
     ):
         """搜索用户
 
-        用法: /admin search <关键词> [数量]
+        用法：/admin search <关键词> [数量]
 
-        示例:
+        示例：
             /admin search alice
             /admin search bob 5
         """
@@ -183,9 +183,9 @@ class Main(
     async def admin_ignore(self, event: AstrMessageEvent, user: str):
         """屏蔽用户
 
-        用法: /admin ignore <用户ID>
+        用法：/admin ignore <用户 ID>
 
-        示例:
+        示例：
             /admin ignore @annoying:example.com
         """
         async for result in self.cmd_ignore(event, user):
@@ -195,9 +195,9 @@ class Main(
     async def admin_unignore(self, event: AstrMessageEvent, user: str):
         """取消屏蔽用户
 
-        用法: /admin unignore <用户ID>
+        用法：/admin unignore <用户 ID>
 
-        示例:
+        示例：
             /admin unignore @user:example.com
         """
         async for result in self.cmd_unignore(event, user):
@@ -207,7 +207,7 @@ class Main(
     async def admin_ignorelist(self, event: AstrMessageEvent):
         """查看屏蔽列表
 
-        用法: /admin ignorelist
+        用法：/admin ignorelist
         """
         async for result in self.cmd_ignorelist(event):
             yield result
@@ -223,9 +223,9 @@ class Main(
     ):
         """创建新房间
 
-        用法: /admin createroom <房间名> [是否公开]
+        用法：/admin createroom <房间名> [是否公开]
 
-        示例:
+        示例：
             /admin createroom 新群组
             /admin createroom 公开频道 yes
         """
@@ -236,9 +236,9 @@ class Main(
     async def admin_dm(self, event: AstrMessageEvent, user: str):
         """创建与用户的私聊房间
 
-        用法: /admin dm <用户ID>
+        用法：/admin dm <用户 ID>
 
-        示例:
+        示例：
             /admin dm @friend:example.com
         """
         async for result in self.cmd_dm(event, user):
@@ -250,9 +250,9 @@ class Main(
     async def admin_setname(self, event: AstrMessageEvent, name: str):
         """修改 Bot 的显示名称
 
-        用法: /admin setname <新名称>
+        用法：/admin setname <新名称>
 
-        示例:
+        示例：
             /admin setname MyBot
             /admin setname 我的机器人
         """
@@ -263,9 +263,9 @@ class Main(
     async def admin_setavatar(self, event: AstrMessageEvent):
         """通过引用图片修改 Bot 的头像
 
-        用法: 引用一条包含图片的消息，然后发送 /admin setavatar
+        用法：引用一条包含图片的消息，然后发送 /admin setavatar
 
-        示例:
+        示例：
             1. 先发送或找到一张图片
             2. 引用该图片消息
             3. 发送 /admin setavatar

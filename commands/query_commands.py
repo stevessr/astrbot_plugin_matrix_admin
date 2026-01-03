@@ -10,14 +10,14 @@ from .base import AdminCommandMixin
 
 
 class QueryCommandsMixin(AdminCommandMixin):
-    """查询命令: whois, search"""
+    """查询命令：whois, search"""
 
     async def cmd_whois(self, event: AstrMessageEvent, user: str):
         """查询用户信息
 
-        用法: /admin whois <用户ID>
+        用法：/admin whois <用户 ID>
 
-        示例:
+        示例：
             /admin whois @user:example.com
         """
         client = self._get_matrix_client(event)
@@ -54,25 +54,25 @@ class QueryCommandsMixin(AdminCommandMixin):
                 membership = member_info.get("membership", "未知")
 
             lines = [
-                f"**用户信息: {user_id}**\n",
-                f"显示名称: {display_name}",
-                f"头像: {avatar_url}",
-                f"房间状态: {membership}",
-                f"权限等级: {power_level}",
+                f"**用户信息：{user_id}**\n",
+                f"显示名称：{display_name}",
+                f"头像：{avatar_url}",
+                f"房间状态：{membership}",
+                f"权限等级：{power_level}",
             ]
 
             yield event.plain_result("\n".join(lines))
 
         except Exception as e:
-            logger.error(f"查询用户信息失败: {e}")
-            yield event.plain_result(f"查询用户信息失败: {e}")
+            logger.error(f"查询用户信息失败：{e}")
+            yield event.plain_result(f"查询用户信息失败：{e}")
 
     async def cmd_search(self, event: AstrMessageEvent, keyword: str, limit: int = 10):
         """搜索用户
 
-        用法: /admin search <关键词> [数量]
+        用法：/admin search <关键词> [数量]
 
-        示例:
+        示例：
             /admin search alice
             /admin search bob 5
         """
@@ -101,5 +101,5 @@ class QueryCommandsMixin(AdminCommandMixin):
             yield event.plain_result("\n".join(lines))
 
         except Exception as e:
-            logger.error(f"搜索用户失败: {e}")
-            yield event.plain_result(f"搜索用户失败: {e}")
+            logger.error(f"搜索用户失败：{e}")
+            yield event.plain_result(f"搜索用户失败：{e}")

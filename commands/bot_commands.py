@@ -10,14 +10,27 @@ from .base import AdminCommandMixin
 
 
 class BotCommandsMixin(AdminCommandMixin):
-    """Bot 资料管理命令: setname, setavatar"""
+    """Bot 资料管理命令：setname, setavatar, setstatus"""
+
+    # 状态映射
+    STATUS_MAP = {
+        "online": ("online", "在线"),
+        "在线": ("online", "在线"),
+        "away": ("unavailable", "离开"),
+        "离开": ("unavailable", "离开"),
+        "unavailable": ("unavailable", "离开"),
+        "busy": ("unavailable", "忙碌"),
+        "忙碌": ("unavailable", "忙碌"),
+        "offline": ("offline", "离线"),
+        "离线": ("offline", "离线"),
+    }
 
     async def cmd_setname(self, event: AstrMessageEvent, name: str):
         """修改 Bot 的显示名称
 
-        用法: /admin setname <新名称>
+        用法：/admin setname <新名称>
 
-        示例:
+        示例：
             /admin setname MyBot
             /admin setname 我的机器人
         """
@@ -32,17 +45,17 @@ class BotCommandsMixin(AdminCommandMixin):
 
         try:
             await client.set_display_name(name.strip())
-            yield event.plain_result(f"已将 Bot 名称修改为: **{name.strip()}**")
+            yield event.plain_result(f"已将 Bot 名称修改为：**{name.strip()}**")
         except Exception as e:
-            logger.error(f"修改 Bot 名称失败: {e}")
-            yield event.plain_result(f"修改 Bot 名称失败: {e}")
+            logger.error(f"修改 Bot 名称失败：{e}")
+            yield event.plain_result(f"修改 Bot 名称失败：{e}")
 
     async def cmd_setavatar(self, event: AstrMessageEvent):
         """通过引用图片修改 Bot 的头像
 
-        用法: 引用一条包含图片的消息，然后发送 /admin setavatar
+        用法：引用一条包含图片的消息，然后发送 /admin setavatar
 
-        示例:
+        示例：
             1. 先发送或找到一张图片
             2. 引用该图片消息
             3. 发送 /admin setavatar
@@ -71,7 +84,7 @@ class BotCommandsMixin(AdminCommandMixin):
                         in_reply_to = relates_to.get("m.in_reply_to", {})
                         reply_event_id = in_reply_to.get("event_id")
         except Exception as e:
-            logger.debug(f"获取引用事件 ID 失败: {e}")
+            logger.debug(f"获取引用事件 ID 失败：{e}")
 
         if not reply_event_id:
             yield event.plain_result(
@@ -102,7 +115,7 @@ class BotCommandsMixin(AdminCommandMixin):
                 image_mxc_url = reply_content.get("url")
             else:
                 yield event.plain_result(
-                    f"被引用的消息不是图片 (类型: {msgtype})\n请引用一条包含图片的消息"
+                    f"被引用的消息不是图片 (类型：{msgtype})\n请引用一条包含图片的消息"
                 )
                 return
 
@@ -117,5 +130,5 @@ class BotCommandsMixin(AdminCommandMixin):
             )
 
         except Exception as e:
-            logger.error(f"修改 Bot 头像失败: {e}")
-            yield event.plain_result(f"修改 Bot 头像失败: {e}")
+            logger.error(f"修改 Bot 头像失败：{e}")
+            yield event.plain_result(f"修改 Bot 头像失败：{e}")
