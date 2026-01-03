@@ -132,3 +132,96 @@ class BotCommandsMixin(AdminCommandMixin):
         except Exception as e:
             logger.error(f"修改 Bot 头像失败：{e}")
             yield event.plain_result(f"修改 Bot 头像失败：{e}")
+
+    async def cmd_setstatus(
+        self, event: AstrMessageEvent, status: str = "", message: str = ""
+    ):
+        """修改 Bot 的在线状态
+
+        用法：/admin setstatus <状态> [状态消息]
+
+        状态：
+            online / 在线 - 在线
+            away / 离开 / busy / 忙碌 - 离开/忙碌
+            offline / 离线 - 离线
+
+        示例：
+            /admin setstatus online
+            /admin setstatus away 暂时离开
+            /admin setstatus 忙碌 正在处理任务
+        """
+        client = self._get_matrix_client(event)
+        if not client:
+            yield event.plain_result("此命令仅在 Matrix 平台可用")
+            return
+
+        if not status:
+            # 显示帮助信息
+            yield event.plain_result(
+                "**修改 Bot 状态**\n\n"
+                "用法：/admin setstatus <状态> [状态消息]\n\n"
+                "可用状态:\n"
+                "  - `online` / `在线` - 在线\n"
+                "  - `away` / `离开` / `busy` / `忙碌` - 离开\n"
+                "  - `offline` / `离线` - 离线\n\n"
+                "示例:\n"
+                "  /admin setstatus online\n"
+                "  /admin setstatus away 暂时离开"
+            )
+            return
+
+        # 解析状态
+        status_key = status.lower().strip()
+        if status_key not in self.STATUS_MAP:
+            valid_statuses = ", ".join(
+                [
+                    f"`{k}`"
+                    for k in ["online", "away", "offline", "在线", "离开", "离线"]
+                ]
+            )
+            yield event.plain_result(
+                f"无效的状态：`{status}`\n\n可用状态：{valid_statuses}"
+            )
+            return
+
+        matrix_status, status_display = self.STATUS_MAP[status_key]
+
+        try:
+            await client.set_presence(
+                matrix_status, message.strip() if message else None
+            )
+            result_msg = f"已将 Bot 状态设置为：**{status_display}**"
+            if message:
+                result_msg += f"\n状态消息：{message.strip()}"
+            yield event.plain_result(result_msg)
+        except Exception as e:
+            logger.error(f"修改 Bot 状态失败：{e}")
+            yield event.plain_result(f"修改 Bot 状态失败：{e}")
+
+    async def cmd_statusmsg(self, event: AstrMessageEvent, message: str = ""):
+        """设置或清除 Bot 的状态消息（不改变在线状态）
+
+        用法：/admin statusmsg [消息]
+
+        示例：
+            /admin statusmsg 正在处理任务
+            /admin statusmsg 休息中，稍后回复
+            /admin statusmsg  (留空则清除状态消息)
+        """
+        client = self._get_matrix_client(event)
+        if not client:
+            yield event.plain_result("此命令仅在 Matrix 平台可用")
+            return
+
+        try:
+            # 使用 online 状态，只更新状态消息
+            status_msg = message.strip() if message else None
+            await client.set_presence("online", status_msg)
+
+            if status_msg:
+                yield event.plain_result(f"已设置状态消息：**{status_msg}**")
+            else:
+                yield event.plain_result("已清除状态消息")
+        except Exception as e:
+            logger.error(f"设置状态消息失败：{e}")
+            yield event.plain_result(f"设置状态消息失败：{e}")
