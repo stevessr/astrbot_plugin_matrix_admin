@@ -6,7 +6,7 @@ Matrix Admin Plugin - 提供 Matrix 房间管理命令
 """
 
 from astrbot.api.event import AstrMessageEvent, filter
-from astrbot.api.star import Context, Star
+from astrbot.api.star import Context, Star, register
 
 from .commands import (
     AdminCommandMixin,
@@ -19,7 +19,8 @@ from .commands import (
 )
 
 
-class Main(
+@register("astrbot_plugin_matrix_admin", "stevessr", "Matrix 房间管理插件，提供用户管理、权限控制、封禁踢出等管理命令", "0.1.0")
+class Matrix_Admin_Plugin(
     Star,
     UserCommandsMixin,
     PowerCommandsMixin,
