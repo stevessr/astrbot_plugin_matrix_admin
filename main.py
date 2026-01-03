@@ -21,7 +21,6 @@ from .commands import (
 
 class Main(
     Star,
-    AdminCommandMixin,
     UserCommandsMixin,
     PowerCommandsMixin,
     QueryCommandsMixin,
