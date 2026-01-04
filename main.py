@@ -136,6 +136,64 @@ class Matrix_Admin_Plugin(
         async for result in self.cmd_dm(event, user):
             yield result
 
+    @admin_group.command("aliasset")
+    async def admin_alias_set(
+        self, event: AstrMessageEvent, alias: str, room_id: str = ""
+    ):
+        """设置房间别名"""
+        async for result in self.cmd_alias_set(event, alias, room_id):
+            yield result
+
+    @admin_group.command("aliasdel")
+    async def admin_alias_del(self, event: AstrMessageEvent, alias: str):
+        """删除房间别名"""
+        async for result in self.cmd_alias_del(event, alias):
+            yield result
+
+    @admin_group.command("aliasget")
+    async def admin_alias_get(self, event: AstrMessageEvent, alias: str):
+        """解析房间别名"""
+        async for result in self.cmd_alias_get(event, alias):
+            yield result
+
+    @admin_group.command("publicrooms")
+    async def admin_publicrooms(
+        self, event: AstrMessageEvent, server: str = "", limit: int = 20
+    ):
+        """列出公共房间"""
+        async for result in self.cmd_publicrooms(event, server, limit):
+            yield result
+
+    @admin_group.command("forget")
+    async def admin_forget(self, event: AstrMessageEvent, room_id: str = ""):
+        """忘记房间"""
+        async for result in self.cmd_forget(event, room_id):
+            yield result
+
+    @admin_group.command("upgrade")
+    async def admin_upgrade(
+        self, event: AstrMessageEvent, new_version: str, room_id: str = ""
+    ):
+        """升级房间版本"""
+        async for result in self.cmd_upgrade(event, new_version, room_id):
+            yield result
+
+    @admin_group.command("hierarchy")
+    async def admin_hierarchy(
+        self, event: AstrMessageEvent, room_id: str = "", limit: int = 20
+    ):
+        """获取房间层级"""
+        async for result in self.cmd_hierarchy(event, room_id, limit):
+            yield result
+
+    @admin_group.command("knock")
+    async def admin_knock(
+        self, event: AstrMessageEvent, room_id_or_alias: str, reason: str = ""
+    ):
+        """敲门请求加入房间"""
+        async for result in self.cmd_knock(event, room_id_or_alias, reason):
+            yield result
+
     @admin_group.command("setname")
     async def admin_setname(self, event: AstrMessageEvent, name: str):
         """修改 Bot 的显示名称"""
