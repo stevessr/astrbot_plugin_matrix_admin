@@ -3,6 +3,8 @@ Matrix Admin Plugin - Bot Commands
 Bot 资料管理相关命令
 """
 
+import time
+
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 
@@ -185,10 +187,15 @@ class BotCommandsMixin(AdminCommandMixin):
             return
 
         matrix_status, status_display = self.STATUS_MAP[status_key]
+        now_ms = int(time.time() * 1000)
+        currently_active = matrix_status == "online"
 
         try:
             await client.set_presence(
-                matrix_status, message.strip() if message else None
+                matrix_status,
+                message.strip() if message else None,
+                last_active_ts=now_ms,
+                currently_active=currently_active,
             )
             result_msg = f"已将 Bot 状态设置为：**{status_display}**"
             if message:
@@ -216,7 +223,12 @@ class BotCommandsMixin(AdminCommandMixin):
         try:
             # 使用 online 状态，只更新状态消息
             status_msg = message.strip() if message else None
-            await client.set_presence("online", status_msg)
+            await client.set_presence(
+                "online",
+                status_msg,
+                last_active_ts=int(time.time() * 1000),
+                currently_active=True,
+            )
 
             if status_msg:
                 yield event.plain_result(f"已设置状态消息：**{status_msg}**")
