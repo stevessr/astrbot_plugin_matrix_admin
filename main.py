@@ -29,9 +29,26 @@ class Matrix_Admin_Plugin(
     RoomCommandsMixin,
     BotCommandsMixin,
 ):
-    def __init__(self, context: Context) -> None:
-        super().__init__(context)
+    def __init__(self, context: Context, config: dict | None = None) -> None:
+        super().__init__(context, config)
         self.context = context
+        self.config = config or {}
+        self.verify_room_id = self.config.get("matrix_admin_verify_room_id", "")
+        if self.verify_room_id:
+            self._apply_admin_room_config(self.verify_room_id)
+
+    def _apply_admin_room_config(self, room_id: str):
+        for platform in self.context.platform_manager.platform_insts:
+            try:
+                meta = platform.meta()
+            except Exception:
+                continue
+            if getattr(meta, "name", "") != "matrix":
+                continue
+            e2ee_manager = getattr(platform, "e2ee_manager", None)
+            verification = getattr(e2ee_manager, "_verification", None) if e2ee_manager else None
+            if verification:
+                verification.set_admin_notify_room(room_id)
 
     # ========== Command Bindings ==========
     # 装饰器必须定义在 main.py 中，否则 handler 的 __module__ 不匹配
@@ -219,3 +236,34 @@ class Matrix_Admin_Plugin(
         """设置或清除 Bot 的状态消息"""
         async for result in self.cmd_statusmsg(event, message):
             yield result
+
+    @admin_group.command("verify")
+    async def admin_verify(self, event: AstrMessageEvent, device_id: str):
+        """手动确认 SAS 验证（需要配置 matrix_admin_verify_room_id）"""
+        if event.platform_meta.name != "matrix":
+            yield event.plain_result("此命令仅在 Matrix 平台可用")
+            return
+
+        if self.verify_room_id:
+            self._apply_admin_room_config(self.verify_room_id)
+
+        e2ee_manager = None
+        try:
+            for platform in self.context.platform_manager.platform_insts:
+                meta = platform.meta()
+                if meta.name == "matrix" and meta.id == event.get_platform_id():
+                    e2ee_manager = getattr(platform, "e2ee_manager", None)
+                    break
+        except Exception as e:
+            yield event.plain_result(f"获取适配器失败：{e}")
+            return
+
+        if not e2ee_manager or not getattr(e2ee_manager, "_verification", None):
+            yield event.plain_result("端到端加密未启用或验证模块未初始化")
+            return
+
+        ok, message = await e2ee_manager._verification.approve_device(device_id)
+        if ok:
+            yield event.plain_result(f"✅ {message}")
+        else:
+            yield event.plain_result(f"❌ {message}")

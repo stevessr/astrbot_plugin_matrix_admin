@@ -1,0 +1,8 @@
+{
+  "matrix_admin_verify_room_id": {
+    "description": "管理员验证通知房间",
+    "type": "string",
+    "hint": "Matrix 管理员验证通知房间 ID（用于 /admin verify 手动确认 SAS）",
+    "default": ""
+  }
+}

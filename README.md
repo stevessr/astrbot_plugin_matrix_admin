@@ -6,6 +6,14 @@ Matrix 房间管理插件，提供用户管理、权限控制、封禁踢出等�
 
 - `astrbot_plugin_matrix_adapter`
 
+## 配置
+
+```json
+{
+  "matrix_admin_verify_room_id": "!roomid:example.org"
+}
+```
+
 ## 命令概览
 
 所有命令以 `/admin` 作为命令组前缀：
@@ -15,6 +23,7 @@ Matrix 房间管理插件，提供用户管理、权限控制、封禁踢出等�
 - 忽略列表: `ignore`, `unignore`, `ignorelist`
 - 房间管理: `createroom`, `dm`, `aliasset`, `aliasdel`, `aliasget`, `publicrooms`, `forget`, `upgrade`, `hierarchy`, `knock`
 - Bot 资料: `setname`, `setavatar`, `setstatus`, `statusmsg`
+- 验证: `verify`
 
 ## 使用示例
 
@@ -40,6 +49,7 @@ Matrix 房间管理插件，提供用户管理、权限控制、封禁踢出等�
 /admin hierarchy !roomid:example.org 20
 /admin knock #room:example.org hi
 /admin setname AstrBot
+/admin verify DEVICEID123
 ```
 
 ## 说明
