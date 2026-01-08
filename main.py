@@ -7,6 +7,7 @@ Matrix Admin Plugin - 提供 Matrix 房间管理命令
 
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
+from astrbot.core.star.filter.command import GreedyStr
 
 from .commands import (
     AdminCommandMixin,
@@ -212,7 +213,7 @@ class Matrix_Admin_Plugin(
             yield result
 
     @admin_group.command("setname")
-    async def admin_setname(self, event: AstrMessageEvent, name: str):
+    async def admin_setname(self, event: AstrMessageEvent, name: GreedyStr):
         """修改 Bot 的显示名称"""
         async for result in self.cmd_setname(event, name):
             yield result
