@@ -238,6 +238,14 @@ class Matrix_Admin_Plugin(
         async for result in self.cmd_statusmsg(event, message):
             yield result
 
+    @admin_group.command("purgebot")
+    async def admin_purgebot(
+        self, event: AstrMessageEvent, limit: int = 100, room_id: str = ""
+    ):
+        """清理机器人历史消息"""
+        async for result in self.cmd_purge_bot_messages(event, limit, room_id):
+            yield result
+
     @admin_group.command("verify")
     async def admin_verify(self, event: AstrMessageEvent, device_id: str):
         """手动确认 SAS 验证（需要配置 matrix_admin_verify_room_id）"""

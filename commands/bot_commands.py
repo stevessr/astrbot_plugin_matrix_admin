@@ -237,3 +237,91 @@ class BotCommandsMixin(AdminCommandMixin):
         except Exception as e:
             logger.error(f"设置状态消息失败：{e}")
             yield event.plain_result(f"设置状态消息失败：{e}")
+
+    async def cmd_purge_bot_messages(
+        self, event: AstrMessageEvent, limit: int = 100, room_id: str = ""
+    ):
+        """清理机器人在房间内发送的历史消息
+
+        用法：/admin purgebot [数量] [room_id]
+
+        示例：
+            /admin purgebot
+            /admin purgebot 200
+            /admin purgebot 200 !roomid:example.org
+        """
+        client = self._get_matrix_client(event)
+        if not client:
+            yield event.plain_result("此命令仅在 Matrix 平台可用")
+            return
+
+        try:
+            limit = int(limit)
+        except (TypeError, ValueError):
+            yield event.plain_result("数量必须是整数")
+            return
+
+        if limit <= 0:
+            yield event.plain_result("数量必须大于 0")
+            return
+
+        target_room_id = room_id.strip() or event.get_session_id()
+        if not target_room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
+
+        bot_user_id = getattr(client, "user_id", None)
+        if not bot_user_id:
+            try:
+                whoami = await client.whoami()
+                bot_user_id = whoami.get("user_id")
+            except Exception as e:
+                yield event.plain_result(f"获取 Bot 用户 ID 失败：{e}")
+                return
+
+        scanned = 0
+        redacted = 0
+        failed = 0
+        from_token = None
+        remaining = limit
+
+        while remaining > 0:
+            batch_limit = min(100, remaining)
+            try:
+                resp = await client.room_messages(
+                    room_id=target_room_id,
+                    from_token=from_token,
+                    direction="b",
+                    limit=batch_limit,
+                )
+            except Exception as e:
+                yield event.plain_result(f"拉取房间消息失败：{e}")
+                return
+
+            chunk = resp.get("chunk", []) or []
+            if not chunk:
+                break
+
+            for msg in chunk:
+                scanned += 1
+                if msg.get("sender") != bot_user_id:
+                    continue
+                event_id = msg.get("event_id")
+                if not event_id:
+                    continue
+                try:
+                    await client.redact_event(
+                        target_room_id, event_id, reason="admin purge bot messages"
+                    )
+                    redacted += 1
+                except Exception:
+                    failed += 1
+
+            remaining -= len(chunk)
+            from_token = resp.get("end")
+            if not from_token:
+                break
+
+        yield event.plain_result(
+            f"清理完成：扫描 {scanned} 条，撤回 {redacted} 条，失败 {failed} 条"
+        )
