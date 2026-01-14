@@ -3,8 +3,6 @@ Matrix Admin Plugin - Room Commands
 房间管理相关命令
 """
 
-from astrbot_plugin_matrix_adapter.room_member_store import MatrixRoomMemberStore
-from astrbot_plugin_matrix_adapter.user_store import MatrixUserStore
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
@@ -292,6 +290,15 @@ class RoomCommandsMixin(AdminCommandMixin):
 
         用法：/admin roomrefresh [room_id|all]
         """
+        try:
+            from astrbot_plugin_matrix_adapter.room_member_store import (
+                MatrixRoomMemberStore,
+            )
+            from astrbot_plugin_matrix_adapter.user_store import MatrixUserStore
+        except Exception:
+            yield event.plain_result("未安装 Matrix 适配器插件，无法刷新房间缓存")
+            return
+
         client = self._get_matrix_client(event)
         if not client:
             yield event.plain_result("此命令仅在 Matrix 平台可用")
