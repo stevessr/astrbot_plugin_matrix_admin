@@ -7,6 +7,7 @@ import time
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
+from astrbot.core.star.filter.command import GreedyStr
 
 from .base import AdminCommandMixin
 
@@ -27,7 +28,7 @@ class BotCommandsMixin(AdminCommandMixin):
         "离线": ("offline", "离线"),
     }
 
-    async def cmd_setname(self, event: AstrMessageEvent, name: str):
+    async def cmd_setname(self, event: AstrMessageEvent, name: GreedyStr):
         """修改 Bot 的显示名称
 
         用法：/admin setname <新名称>

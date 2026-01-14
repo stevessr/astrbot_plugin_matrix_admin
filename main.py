@@ -212,6 +212,12 @@ class Matrix_Admin_Plugin(
         async for result in self.cmd_knock(event, room_id_or_alias, reason):
             yield result
 
+    @admin_group.command("roomrefresh")
+    async def admin_roomrefresh(self, event: AstrMessageEvent, room_id: str = ""):
+        """重新获取房间信息"""
+        async for result in self.cmd_room_refresh(event, room_id):
+            yield result
+
     @admin_group.command("setname")
     async def admin_setname(self, event: AstrMessageEvent, name: GreedyStr):
         """修改 Bot 的显示名称"""

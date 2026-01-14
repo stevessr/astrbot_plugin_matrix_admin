@@ -21,9 +21,8 @@ Matrix 房间管理插件，提供用户管理、权限控制、封禁踢出等�
 - 用户管理：`kick`, `ban`, `unban`, `invite`, `promote`, `demote`, `power`
 - 信息查询：`admins`, `whois`, `search`
 - 忽略列表：`ignore`, `unignore`, `ignorelist`
-- 房间管理：`createroom`, `dm`, `aliasset`, `aliasdel`, `aliasget`, `publicrooms`, `forget`, `upgrade`, `hierarchy`, `knock`
+- 房间管理：`createroom`, `dm`, `aliasset`, `aliasdel`, `aliasget`, `publicrooms`, `forget`, `upgrade`, `hierarchy`, `knock`, `roomrefresh`
 - Bot 管理：`setname`, `setavatar`, `setstatus`, `statusmsg`, `purgebot`
-- Bot 资料：`setname`, `setavatar`, `setstatus`, `statusmsg`
 - 验证：`verify`
 
 ## 使用示例
@@ -52,6 +51,8 @@ Matrix 房间管理插件，提供用户管理、权限控制、封禁踢出等�
 /admin setname AstrBot
 /admin verify DEVICEID123
 /admin purgebot 200
+/admin roomrefresh
+/admin roomrefresh all
 ```
 
 ## 说明

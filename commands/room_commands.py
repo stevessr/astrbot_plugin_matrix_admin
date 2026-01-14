@@ -3,6 +3,9 @@ Matrix Admin Plugin - Room Commands
 房间管理相关命令
 """
 
+from astrbot_plugin_matrix_adapter.room_member_store import MatrixRoomMemberStore
+from astrbot_plugin_matrix_adapter.user_store import MatrixUserStore
+
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 
@@ -283,3 +286,118 @@ class RoomCommandsMixin(AdminCommandMixin):
         except Exception as e:
             logger.error(f"敲门请求失败：{e}")
             yield event.plain_result(f"敲门请求失败：{e}")
+
+    async def cmd_room_refresh(self, event: AstrMessageEvent, room_id: str = ""):
+        """重新获取房间信息并刷新本地缓存
+
+        用法：/admin roomrefresh [room_id|all]
+        """
+        client = self._get_matrix_client(event)
+        if not client:
+            yield event.plain_result("此命令仅在 Matrix 平台可用")
+            return
+
+        target = room_id.strip() if room_id else event.get_session_id()
+        if not target:
+            yield event.plain_result("无法获取房间 ID")
+            return
+
+        async def _refresh_room(target_room: str) -> tuple[bool, str]:
+            try:
+                members_resp = await client.get_room_members(target_room)
+                chunk = members_resp.get("chunk", []) or []
+            except Exception as e:
+                logger.error(f"获取房间成员失败：{e}")
+                return False, f"{target_room} 获取成员失败：{e}"
+
+            members: dict[str, str] = {}
+            member_avatars: dict[str, str] = {}
+            for evt in chunk:
+                if evt.get("type") != "m.room.member":
+                    continue
+                user_id = evt.get("state_key")
+                if not user_id:
+                    continue
+                content = evt.get("content", {})
+                if content.get("membership") != "join":
+                    continue
+                display_name = content.get("displayname") or user_id
+                members[user_id] = display_name
+                avatar_url = content.get("avatar_url")
+                if avatar_url:
+                    member_avatars[user_id] = avatar_url
+
+            member_count = len(members)
+            MatrixRoomMemberStore().upsert(
+                room_id=target_room,
+                members=members,
+                member_avatars=member_avatars,
+                member_count=member_count,
+                is_direct=None,
+            )
+
+            user_store = MatrixUserStore()
+            for user_id, display_name in members.items():
+                user_store.upsert(user_id, display_name, member_avatars.get(user_id))
+
+            room_name = None
+            room_topic = None
+            canonical_alias = None
+            is_encrypted = False
+            try:
+                state_events = await client.get_room_state(target_room)
+                for evt in state_events:
+                    evt_type = evt.get("type")
+                    content = evt.get("content", {})
+                    if evt_type == "m.room.name":
+                        room_name = content.get("name")
+                    elif evt_type == "m.room.topic":
+                        room_topic = content.get("topic")
+                    elif evt_type == "m.room.canonical_alias":
+                        canonical_alias = content.get("alias")
+                    elif evt_type == "m.room.encryption":
+                        is_encrypted = True
+            except Exception as e:
+                logger.debug(f"获取房间状态失败：{e}")
+
+            lines = [f"已刷新房间信息：`{target_room}`"]
+            if room_name:
+                lines.append(f"名称：{room_name}")
+            if canonical_alias:
+                lines.append(f"别名：{canonical_alias}")
+            lines.append(f"成员数：{member_count}")
+            if room_topic:
+                lines.append(f"主题：{room_topic}")
+            lines.append(f"加密：{'是' if is_encrypted else '否'}")
+            return True, "\n".join(lines)
+
+        if target.lower() == "all":
+            try:
+                rooms = await client.get_joined_rooms()
+            except Exception as e:
+                yield event.plain_result(f"获取已加入房间失败：{e}")
+                return
+
+            if not rooms:
+                yield event.plain_result("没有已加入的房间可刷新")
+                return
+
+            ok_count = 0
+            fail_count = 0
+            for room in rooms:
+                ok, _ = await _refresh_room(room)
+                if ok:
+                    ok_count += 1
+                else:
+                    fail_count += 1
+
+            yield event.plain_result(
+                f"已刷新所有房间：成功 {ok_count} 个，失败 {fail_count} 个"
+            )
+            return
+
+        ok, message = await _refresh_room(target)
+        if ok:
+            yield event.plain_result(message)
+        else:
+            yield event.plain_result(message)
