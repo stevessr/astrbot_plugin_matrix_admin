@@ -330,6 +330,185 @@ class RoomCommandsMixin(AdminCommandMixin):
             logger.error(f"敲门请求失败：{e}")
             yield event.plain_result(f"敲门请求失败：{e}")
 
+    async def cmd_space_create(
+        self,
+        event: AstrMessageEvent,
+        name: str,
+        is_public: str = "no",
+        topic: str = "",
+    ):
+        """创建 Matrix Space
+
+        用法：/admin spacecreate <名称> [是否公开] [主题]
+        """
+        client = self._get_matrix_client(event)
+        if not client:
+            yield event.plain_result("此命令仅在 Matrix 平台可用")
+            return
+
+        name = str(name or "").strip()
+        if not name:
+            yield event.plain_result("Space 名称不能为空")
+            return
+
+        topic_text = str(topic or "").strip()
+        public = str(is_public or "").strip().lower() in (
+            "yes",
+            "true",
+            "1",
+            "public",
+        )
+
+        try:
+            result = await client.create_room(
+                name=name,
+                topic=topic_text or None,
+                is_public=public,
+                creation_content={"type": "m.space"},
+            )
+            space_id = str(result.get("room_id", "") or "")
+            if not space_id:
+                yield event.plain_result("创建 Space 失败：未返回 room_id")
+                return
+            visibility = "公开" if public else "私有"
+            lines = [
+                f"已创建 Space **{name}**",
+                f"Space ID: `{space_id}`",
+                f"可见性：{visibility}",
+            ]
+            if topic_text:
+                lines.append(f"主题：{topic_text}")
+            yield event.plain_result("\n".join(lines))
+        except Exception as e:
+            logger.error(f"创建 Space 失败：{e}")
+            yield event.plain_result(f"创建 Space 失败：{e}")
+
+    async def cmd_space_link(
+        self,
+        event: AstrMessageEvent,
+        space_id: str,
+        child_room_id: str,
+        suggested: str = "yes",
+    ):
+        """将房间关联到 Space
+
+        用法：/admin spacelink <space_id> <room_id> [是否推荐]
+        """
+        client = self._get_matrix_client(event)
+        if not client:
+            yield event.plain_result("此命令仅在 Matrix 平台可用")
+            return
+
+        space_id = str(space_id or "").strip()
+        child_room_id = str(child_room_id or "").strip()
+        if not space_id or not child_room_id:
+            yield event.plain_result("space_id 和 child_room_id 不能为空")
+            return
+
+        server_name = self._resolve_server_name(event, child_room_id)
+        if not server_name:
+            server_name = self._resolve_server_name(event, space_id)
+        content = {"via": [server_name]} if server_name else {"via": []}
+        content["suggested"] = str(suggested or "").strip().lower() in (
+            "yes",
+            "true",
+            "1",
+            "on",
+        )
+
+        try:
+            await client.set_room_state_event(
+                room_id=space_id,
+                event_type="m.space.child",
+                content=content,
+                state_key=child_room_id,
+            )
+            yield event.plain_result(
+                f"已将房间 `{child_room_id}` 挂载到 Space `{space_id}`"
+            )
+        except Exception as e:
+            logger.error(f"Space 挂载失败：{e}")
+            yield event.plain_result(f"Space 挂载失败：{e}")
+
+    async def cmd_space_unlink(
+        self,
+        event: AstrMessageEvent,
+        space_id: str,
+        child_room_id: str,
+    ):
+        """从 Space 移除子房间
+
+        用法：/admin spaceunlink <space_id> <room_id>
+        """
+        client = self._get_matrix_client(event)
+        if not client:
+            yield event.plain_result("此命令仅在 Matrix 平台可用")
+            return
+
+        space_id = str(space_id or "").strip()
+        child_room_id = str(child_room_id or "").strip()
+        if not space_id or not child_room_id:
+            yield event.plain_result("space_id 和 child_room_id 不能为空")
+            return
+
+        try:
+            await client.set_room_state_event(
+                room_id=space_id,
+                event_type="m.space.child",
+                content={},
+                state_key=child_room_id,
+            )
+            yield event.plain_result(
+                f"已从 Space `{space_id}` 移除子房间 `{child_room_id}`"
+            )
+        except Exception as e:
+            logger.error(f"Space 解绑失败：{e}")
+            yield event.plain_result(f"Space 解绑失败：{e}")
+
+    async def cmd_space_children(
+        self,
+        event: AstrMessageEvent,
+        space_id: str,
+        limit: int = 20,
+    ):
+        """查看 Space 子房间列表
+
+        用法：/admin spacechildren <space_id> [limit]
+        """
+        client = self._get_matrix_client(event)
+        if not client:
+            yield event.plain_result("此命令仅在 Matrix 平台可用")
+            return
+
+        space_id = str(space_id or "").strip()
+        if not space_id:
+            yield event.plain_result("space_id 不能为空")
+            return
+
+        try:
+            normalized_limit = max(1, min(int(limit), 100))
+        except (TypeError, ValueError):
+            normalized_limit = 20
+
+        try:
+            result = await client.get_room_hierarchy(space_id, limit=normalized_limit)
+            rooms = result.get("rooms", [])
+            if not rooms:
+                yield event.plain_result("该 Space 下暂无子房间")
+                return
+
+            lines = [f"Space `{space_id}` 子房间："]
+            for room in rooms:
+                if not isinstance(room, dict):
+                    continue
+                name = room.get("name") or room.get("canonical_alias") or "未命名"
+                rid = room.get("room_id", "未知")
+                lines.append(f"- {name} ({rid})")
+            yield event.plain_result("\n".join(lines))
+        except Exception as e:
+            logger.error(f"获取 Space 子房间失败：{e}")
+            yield event.plain_result(f"获取 Space 子房间失败：{e}")
+
     async def cmd_room_refresh(self, event: AstrMessageEvent, room_id: str = ""):
         """重新获取房间信息并刷新本地缓存
 

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 
+from astrbot_plugin_matrix_adapter.utils import MatrixUtils
+
 if TYPE_CHECKING:
     from astrbot.api.star import Context
 
@@ -24,36 +26,8 @@ class AdminCommandMixin:
             return None
 
         try:
-            platform_manager = getattr(self.context, "platform_manager", None)
-            if platform_manager is None:
-                return None
             target_platform_id = str(event.get_platform_id() or "")
-            get_insts = getattr(platform_manager, "get_insts", None)
-            if callable(get_insts):
-                try:
-                    platforms = get_insts()
-                except Exception:
-                    platforms = getattr(platform_manager, "platform_insts", [])
-            else:
-                platforms = getattr(platform_manager, "platform_insts", [])
-            fallback_client = None
-            for platform in platforms:
-                try:
-                    meta = platform.meta()
-                except Exception:
-                    continue
-                meta_name = str(getattr(meta, "name", "") or "").strip().lower()
-                if meta_name != "matrix":
-                    continue
-                client = getattr(platform, "client", None)
-                if client is None:
-                    continue
-                platform_id = str(getattr(meta, "id", "") or "")
-                if target_platform_id and platform_id == target_platform_id:
-                    return client
-                if fallback_client is None:
-                    fallback_client = client
-            return fallback_client
+            return MatrixUtils.get_matrix_client(self.context, target_platform_id)
         except Exception as e:
             logger.debug(f"获取 Matrix 客户端失败：{e}")
 

@@ -10,6 +10,8 @@ from astrbot.api.star import Context, Star, register
 from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.star.filter.permission import PermissionType
 
+from astrbot_plugin_matrix_adapter.utils import MatrixUtils
+
 from .commands import (
     BotCommandsMixin,
     IgnoreCommandsMixin,
@@ -48,31 +50,10 @@ class Matrix_Admin_Plugin(
         self._apply_admin_room_config(self.verify_room_id)
 
     def _apply_admin_room_config(self, room_id: str):
-        platform_manager = getattr(self.context, "platform_manager", None)
-        if platform_manager is None:
-            return
-        get_insts = getattr(platform_manager, "get_insts", None)
-        if callable(get_insts):
-            try:
-                platforms = get_insts()
-            except Exception:
-                platforms = getattr(platform_manager, "platform_insts", [])
-        else:
-            platforms = getattr(platform_manager, "platform_insts", [])
-        for platform in platforms:
-            try:
-                meta = platform.meta()
-            except Exception:
-                continue
-            meta_name = str(getattr(meta, "name", "") or "").strip().lower()
-            if meta_name != "matrix":
-                continue
-            e2ee_manager = getattr(platform, "e2ee_manager", None)
-            verification = (
-                getattr(e2ee_manager, "_verification", None) if e2ee_manager else None
-            )
-            if verification:
-                verification.set_admin_notify_room(room_id)
+        e2ee_manager = MatrixUtils.get_matrix_e2ee_manager(self.context)
+        verification = getattr(e2ee_manager, "_verification", None) if e2ee_manager else None
+        if verification:
+            verification.set_admin_notify_room(room_id)
 
     @staticmethod
     def _split_reason_and_room_id(reason_or_room: str) -> tuple[str, str]:
@@ -286,6 +267,61 @@ class Matrix_Admin_Plugin(
         async for result in self.cmd_hierarchy(event, room_id, limit):
             yield result
 
+    @admin_group.command("spacecreate")
+    @filter.permission_type(PermissionType.ADMIN)
+    async def admin_spacecreate(
+        self,
+        event: AstrMessageEvent,
+        name: str,
+        is_public: str = "no",
+        topic: str = "",
+    ):
+        """创建 Space"""
+        async for result in self.cmd_space_create(event, name, is_public, topic):
+            yield result
+
+    @admin_group.command("spacelink")
+    @filter.permission_type(PermissionType.ADMIN)
+    async def admin_spacelink(
+        self,
+        event: AstrMessageEvent,
+        space_id: str,
+        child_room_id: str,
+        suggested: str = "yes",
+    ):
+        """挂载 Space 子房间"""
+        async for result in self.cmd_space_link(
+            event,
+            space_id,
+            child_room_id,
+            suggested,
+        ):
+            yield result
+
+    @admin_group.command("spaceunlink")
+    @filter.permission_type(PermissionType.ADMIN)
+    async def admin_spaceunlink(
+        self,
+        event: AstrMessageEvent,
+        space_id: str,
+        child_room_id: str,
+    ):
+        """移除 Space 子房间"""
+        async for result in self.cmd_space_unlink(event, space_id, child_room_id):
+            yield result
+
+    @admin_group.command("spacechildren")
+    @filter.permission_type(PermissionType.ADMIN)
+    async def admin_spacechildren(
+        self,
+        event: AstrMessageEvent,
+        space_id: str,
+        limit: int = 20,
+    ):
+        """查看 Space 子房间"""
+        async for result in self.cmd_space_children(event, space_id, limit):
+            yield result
+
     @admin_group.command("knock")
     @filter.permission_type(PermissionType.ADMIN)
     async def admin_knock(
@@ -353,30 +389,11 @@ class Matrix_Admin_Plugin(
 
         e2ee_manager = None
         try:
-            platform_manager = getattr(self.context, "platform_manager", None)
-            if platform_manager is None:
-                yield event.plain_result("获取适配器失败：platform manager 不可用")
-                return
-            get_insts = getattr(platform_manager, "get_insts", None)
-            if callable(get_insts):
-                try:
-                    platforms = get_insts()
-                except Exception:
-                    platforms = getattr(platform_manager, "platform_insts", [])
-            else:
-                platforms = getattr(platform_manager, "platform_insts", [])
-            for platform in platforms:
-                try:
-                    meta = platform.meta()
-                except Exception:
-                    continue
-                if str(
-                    getattr(meta, "name", "") or ""
-                ).strip().lower() == "matrix" and str(
-                    getattr(meta, "id", "") or ""
-                ) == str(event.get_platform_id() or ""):
-                    e2ee_manager = getattr(platform, "e2ee_manager", None)
-                    break
+            target_platform_id = str(event.get_platform_id() or "")
+            e2ee_manager = MatrixUtils.get_matrix_e2ee_manager(
+                self.context,
+                target_platform_id,
+            )
         except Exception as e:
             yield event.plain_result(f"获取适配器失败：{e}")
             return
