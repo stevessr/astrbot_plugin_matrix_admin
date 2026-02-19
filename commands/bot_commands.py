@@ -269,7 +269,7 @@ class BotCommandsMixin(AdminCommandMixin):
             yield event.plain_result("数量必须大于 0")
             return
 
-        target_room_id = room_id.strip() or event.get_session_id()
+        target_room_id = room_id.strip() or str(event.get_session_id() or "").strip()
         if not target_room_id:
             yield event.plain_result("无法获取房间 ID")
             return
