@@ -11,7 +11,6 @@ from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.star.filter.permission import PermissionType
 
 from .commands import (
-    AdminCommandMixin,
     BotCommandsMixin,
     IgnoreCommandsMixin,
     PowerCommandsMixin,
@@ -21,7 +20,12 @@ from .commands import (
 )
 
 
-@register("astrbot_plugin_matrix_admin", "stevessr", "Matrix 房间管理插件，提供用户管理、权限控制、封禁踢出等管理命令", "0.1.0")
+@register(
+    "astrbot_plugin_matrix_admin",
+    "stevessr",
+    "Matrix 房间管理插件，提供用户管理、权限控制、封禁踢出等管理命令",
+    "0.1.0",
+)
 class Matrix_Admin_Plugin(
     Star,
     UserCommandsMixin,
@@ -63,7 +67,9 @@ class Matrix_Admin_Plugin(
             if getattr(meta, "name", "") != "matrix":
                 continue
             e2ee_manager = getattr(platform, "e2ee_manager", None)
-            verification = getattr(e2ee_manager, "_verification", None) if e2ee_manager else None
+            verification = (
+                getattr(e2ee_manager, "_verification", None) if e2ee_manager else None
+            )
             if verification:
                 verification.set_admin_notify_room(room_id)
 
@@ -84,60 +90,78 @@ class Matrix_Admin_Plugin(
 
     @admin_group.command("kick")
     @filter.permission_type(PermissionType.ADMIN)
-    async def admin_kick(self, event: AstrMessageEvent, user: str, reason: str = ""):
+    async def admin_kick(
+        self,
+        event: AstrMessageEvent,
+        user: str,
+        reason: str = "",
+        room_id: str = "",
+    ):
         """踢出用户"""
-        async for result in self.cmd_kick(event, user, reason):
+        async for result in self.cmd_kick(event, user, reason, room_id):
             yield result
 
     @admin_group.command("ban")
     @filter.permission_type(PermissionType.ADMIN)
-    async def admin_ban(self, event: AstrMessageEvent, user: str, reason: str = ""):
+    async def admin_ban(
+        self,
+        event: AstrMessageEvent,
+        user: str,
+        reason: str = "",
+        room_id: str = "",
+    ):
         """封禁用户"""
-        async for result in self.cmd_ban(event, user, reason):
+        async for result in self.cmd_ban(event, user, reason, room_id):
             yield result
 
     @admin_group.command("unban")
     @filter.permission_type(PermissionType.ADMIN)
-    async def admin_unban(self, event: AstrMessageEvent, user: str):
+    async def admin_unban(self, event: AstrMessageEvent, user: str, room_id: str = ""):
         """解除封禁"""
-        async for result in self.cmd_unban(event, user):
+        async for result in self.cmd_unban(event, user, room_id):
             yield result
 
     @admin_group.command("invite")
     @filter.permission_type(PermissionType.ADMIN)
-    async def admin_invite(self, event: AstrMessageEvent, user: str):
+    async def admin_invite(self, event: AstrMessageEvent, user: str, room_id: str = ""):
         """邀请用户加入房间"""
-        async for result in self.cmd_invite(event, user):
+        async for result in self.cmd_invite(event, user, room_id):
             yield result
 
     @admin_group.command("promote")
     @filter.permission_type(PermissionType.ADMIN)
     async def admin_promote(
-        self, event: AstrMessageEvent, user: str, level: str = "mod"
+        self,
+        event: AstrMessageEvent,
+        user: str,
+        level: str = "mod",
+        room_id: str = "",
     ):
         """提升用户权限"""
-        async for result in self.cmd_promote(event, user, level):
+        async for result in self.cmd_promote(event, user, level, room_id):
             yield result
 
     @admin_group.command("demote")
     @filter.permission_type(PermissionType.ADMIN)
-    async def admin_demote(self, event: AstrMessageEvent, user: str):
+    async def admin_demote(self, event: AstrMessageEvent, user: str, room_id: str = ""):
         """降低用户权限为普通成员"""
-        async for result in self.cmd_demote(event, user):
+        async for result in self.cmd_demote(event, user, room_id):
             yield result
 
     @admin_group.command("power")
     @filter.permission_type(PermissionType.ADMIN)
-    async def admin_power(self, event: AstrMessageEvent, user: str, level: int):
+    async def admin_power(
+        self, event: AstrMessageEvent, user: str, level: int, room_id: str = ""
+    ):
         """设置用户权限等级"""
-        async for result in self.cmd_power(event, user, level):
+        async for result in self.cmd_power(event, user, level, room_id):
             yield result
 
     @admin_group.command("admins")
     @filter.permission_type(PermissionType.ADMIN)
-    async def admin_list_admins(self, event: AstrMessageEvent):
+    async def admin_list_admins(self, event: AstrMessageEvent, room_id: str = ""):
         """列出房间管理员"""
-        async for result in self.cmd_admins(event):
+        async for result in self.cmd_admins(event, room_id):
             yield result
 
     @admin_group.command("whois")
@@ -334,10 +358,9 @@ class Matrix_Admin_Plugin(
                     meta = platform.meta()
                 except Exception:
                     continue
-                if (
-                    getattr(meta, "name", "") == "matrix"
-                    and str(getattr(meta, "id", "") or "") == str(event.get_platform_id() or "")
-                ):
+                if getattr(meta, "name", "") == "matrix" and str(
+                    getattr(meta, "id", "") or ""
+                ) == str(event.get_platform_id() or ""):
                     e2ee_manager = getattr(platform, "e2ee_manager", None)
                     break
         except Exception as e:

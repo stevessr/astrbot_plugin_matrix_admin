@@ -57,7 +57,12 @@ class AdminCommandMixin:
 
         return None
 
-    def _parse_user_id(self, user_input: str, event: AstrMessageEvent) -> str | None:
+    def _parse_user_id(
+        self,
+        user_input: str,
+        event: AstrMessageEvent,
+        room_id_hint: str = "",
+    ) -> str | None:
         """解析用户输入为完整的 Matrix 用户 ID"""
         if not user_input:
             return None
@@ -67,7 +72,7 @@ class AdminCommandMixin:
             return user_input
 
         # 尝试从房间 ID 提取服务器域名
-        room_id = str(event.get_session_id() or "")
+        room_id = str(room_id_hint or event.get_session_id() or "")
         if ":" in room_id:
             server = room_id.split(":", 1)[1]
             if user_input.startswith("@"):
@@ -81,3 +86,12 @@ class AdminCommandMixin:
     def _resolve_event_room_id(event: AstrMessageEvent) -> str | None:
         room_id = str(event.get_session_id() or "").strip()
         return room_id or None
+
+    @staticmethod
+    def _resolve_target_room_id(
+        event: AstrMessageEvent, room_id: str = ""
+    ) -> str | None:
+        room_id_text = str(room_id or "").strip()
+        if room_id_text:
+            return room_id_text
+        return AdminCommandMixin._resolve_event_room_id(event)
