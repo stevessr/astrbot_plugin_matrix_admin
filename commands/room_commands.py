@@ -17,6 +17,7 @@ class RoomCommandsMixin(AdminCommandMixin):
         alias = alias.strip()
         if not alias:
             return None
+        room_id = str(room_id or "")
         if not alias.startswith("#"):
             alias = f"#{alias}"
         if ":" in alias:

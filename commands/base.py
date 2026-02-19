@@ -51,7 +51,7 @@ class AdminCommandMixin:
             return user_input
 
         # 尝试从房间 ID 提取服务器域名
-        room_id = event.get_session_id()
+        room_id = str(event.get_session_id() or "")
         if ":" in room_id:
             server = room_id.split(":", 1)[1]
             if user_input.startswith("@"):
