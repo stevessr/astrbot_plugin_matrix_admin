@@ -38,6 +38,8 @@ class QueryCommandsMixin(AdminCommandMixin):
         try:
             # 获取用户资料
             profile = await client.get_user_profile(user_id)
+            if not isinstance(profile, dict):
+                profile = {}
             display_name = profile.get("displayname", "未设置")
             avatar_url = profile.get("avatar_url", "无")
 
@@ -45,7 +47,11 @@ class QueryCommandsMixin(AdminCommandMixin):
             power_level = 0
             try:
                 power_levels = await client.get_power_levels(room_id)
+                if not isinstance(power_levels, dict):
+                    power_levels = {}
                 users = power_levels.get("users", {})
+                if not isinstance(users, dict):
+                    users = {}
                 power_level = users.get(user_id, power_levels.get("users_default", 0))
             except Exception:
                 pass
@@ -53,7 +59,7 @@ class QueryCommandsMixin(AdminCommandMixin):
             # 获取房间成员状态
             member_info = await client.get_room_member(room_id, user_id)
             membership = "未知"
-            if member_info:
+            if isinstance(member_info, dict):
                 membership = member_info.get("membership", "未知")
 
             lines = [
@@ -86,7 +92,11 @@ class QueryCommandsMixin(AdminCommandMixin):
 
         try:
             result = await client.search_users(keyword, limit)
+            if not isinstance(result, dict):
+                result = {}
             users = result.get("results", [])
+            if not isinstance(users, list):
+                users = []
 
             if not users:
                 yield event.plain_result(f"未找到匹配 '{keyword}' 的用户")
@@ -94,6 +104,8 @@ class QueryCommandsMixin(AdminCommandMixin):
 
             lines = [f"**搜索结果 ({len(users)} 个用户):**\n"]
             for user in users:
+                if not isinstance(user, dict):
+                    continue
                 uid = user.get("user_id", "未知")
                 name = user.get("display_name", "")
                 if name:
