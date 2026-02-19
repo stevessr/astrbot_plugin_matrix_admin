@@ -53,8 +53,8 @@ class QueryCommandsMixin(AdminCommandMixin):
                 if not isinstance(users, dict):
                     users = {}
                 power_level = users.get(user_id, power_levels.get("users_default", 0))
-            except Exception:
-                pass
+            except Exception as e:
+                logger.debug(f"获取用户权限等级失败：{e}")
 
             # 获取房间成员状态
             member_info = await client.get_room_member(room_id, user_id)
