@@ -3,7 +3,6 @@ Matrix Admin Plugin - Room Commands
 房间管理相关命令
 """
 
-
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 
@@ -13,7 +12,12 @@ from .base import AdminCommandMixin
 class RoomCommandsMixin(AdminCommandMixin):
     """房间管理命令：createroom, dm, alias, publicrooms, forget, upgrade, hierarchy, knock"""
 
-    def _parse_room_alias(self, alias: str, room_id: str) -> str | None:
+    def _parse_room_alias(
+        self,
+        alias: str,
+        room_id: str = "",
+        server_name: str = "",
+    ) -> str | None:
         alias = alias.strip()
         if not alias:
             return None
@@ -22,10 +26,24 @@ class RoomCommandsMixin(AdminCommandMixin):
             alias = f"#{alias}"
         if ":" in alias:
             return alias
+        server = ""
         if ":" in room_id:
             server = room_id.split(":", 1)[1]
+        if not server:
+            server = str(server_name or "").strip()
+        if server:
             return f"{alias}:{server}"
         return None
+
+    def _resolve_server_name(self, event: AstrMessageEvent, room_id: str = "") -> str:
+        room_id_text = str(room_id or "").strip()
+        if ":" in room_id_text:
+            return room_id_text.split(":", 1)[1]
+        client = self._get_matrix_client(event)
+        client_user_id = str(getattr(client, "user_id", "") or "")
+        if ":" in client_user_id:
+            return client_user_id.split(":", 1)[1]
+        return ""
 
     @staticmethod
     def _resolve_target_room(event: AstrMessageEvent, room_id: str = "") -> str | None:
@@ -94,7 +112,9 @@ class RoomCommandsMixin(AdminCommandMixin):
             logger.error(f"创建私聊房间失败：{e}")
             yield event.plain_result(f"创建私聊房间失败：{e}")
 
-    async def cmd_alias_set(self, event: AstrMessageEvent, alias: str, room_id: str = ""):
+    async def cmd_alias_set(
+        self, event: AstrMessageEvent, alias: str, room_id: str = ""
+    ):
         """设置房间别名
 
         用法：/admin aliasset <alias> [room_id]
@@ -109,7 +129,8 @@ class RoomCommandsMixin(AdminCommandMixin):
         if not target_room:
             yield event.plain_result("无法获取房间 ID")
             return
-        room_alias = self._parse_room_alias(alias, target_room)
+        server_name = self._resolve_server_name(event, target_room)
+        room_alias = self._parse_room_alias(alias, target_room, server_name)
         if not room_alias:
             yield event.plain_result("无效的别名格式")
             return
@@ -131,7 +152,8 @@ class RoomCommandsMixin(AdminCommandMixin):
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
-        room_alias = self._parse_room_alias(alias, event.get_session_id())
+        server_name = self._resolve_server_name(event)
+        room_alias = self._parse_room_alias(alias, "", server_name)
         if not room_alias:
             yield event.plain_result("无效的别名格式")
             return
@@ -153,7 +175,8 @@ class RoomCommandsMixin(AdminCommandMixin):
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
-        room_alias = self._parse_room_alias(alias, event.get_session_id())
+        server_name = self._resolve_server_name(event)
+        room_alias = self._parse_room_alias(alias, "", server_name)
         if not room_alias:
             yield event.plain_result("无效的别名格式")
             return
@@ -226,7 +249,9 @@ class RoomCommandsMixin(AdminCommandMixin):
             logger.error(f"忘记房间失败：{e}")
             yield event.plain_result(f"忘记房间失败：{e}")
 
-    async def cmd_upgrade(self, event: AstrMessageEvent, new_version: str, room_id: str = ""):
+    async def cmd_upgrade(
+        self, event: AstrMessageEvent, new_version: str, room_id: str = ""
+    ):
         """升级房间版本
 
         用法：/admin upgrade <new_version> [room_id]
@@ -401,6 +426,11 @@ class RoomCommandsMixin(AdminCommandMixin):
         if target.lower() == "all":
             try:
                 rooms = await client.get_joined_rooms()
+                if isinstance(rooms, dict):
+                    rooms = rooms.get("joined_rooms", [])
+                if not isinstance(rooms, (list, tuple, set)):
+                    yield event.plain_result("获取已加入房间失败：返回格式无效")
+                    return
             except Exception as e:
                 yield event.plain_result(f"获取已加入房间失败：{e}")
                 return

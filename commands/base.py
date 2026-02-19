@@ -64,21 +64,32 @@ class AdminCommandMixin:
         room_id_hint: str = "",
     ) -> str | None:
         """解析用户输入为完整的 Matrix 用户 ID"""
-        if not user_input:
+        user_text = str(user_input or "").strip()
+        if not user_text:
             return None
 
         # 已经是完整的用户 ID
-        if user_input.startswith("@") and ":" in user_input:
-            return user_input
+        if user_text.startswith("@") and ":" in user_text:
+            return user_text
+        if ":" in user_text and not user_text.startswith("@"):
+            return f"@{user_text}"
 
         # 尝试从房间 ID 提取服务器域名
         room_id = str(room_id_hint or event.get_session_id() or "")
+        server = ""
         if ":" in room_id:
             server = room_id.split(":", 1)[1]
-            if user_input.startswith("@"):
-                return f"{user_input}:{server}"
-            else:
-                return f"@{user_input}:{server}"
+
+        if not server:
+            client = self._get_matrix_client(event)
+            client_user_id = str(getattr(client, "user_id", "") or "")
+            if ":" in client_user_id:
+                server = client_user_id.split(":", 1)[1]
+
+        if server:
+            if user_text.startswith("@"):
+                return f"{user_text}:{server}"
+            return f"@{user_text}:{server}"
 
         return None
 

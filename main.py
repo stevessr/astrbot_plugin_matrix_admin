@@ -73,6 +73,17 @@ class Matrix_Admin_Plugin(
             if verification:
                 verification.set_admin_notify_room(room_id)
 
+    @staticmethod
+    def _split_reason_and_room_id(reason_or_room: str) -> tuple[str, str]:
+        raw = str(reason_or_room or "").strip()
+        if not raw:
+            return "", ""
+        parts = raw.split()
+        last_part = parts[-1]
+        if last_part.startswith("!") and ":" in last_part:
+            return " ".join(parts[:-1]).strip(), last_part
+        return raw, ""
+
     @filter.on_astrbot_loaded()
     async def on_astrbot_loaded(self):
         self._maybe_apply_admin_room_config()
@@ -94,10 +105,10 @@ class Matrix_Admin_Plugin(
         self,
         event: AstrMessageEvent,
         user: str,
-        reason: str = "",
-        room_id: str = "",
+        reason_or_room: GreedyStr = "",
     ):
         """踢出用户"""
+        reason, room_id = self._split_reason_and_room_id(reason_or_room)
         async for result in self.cmd_kick(event, user, reason, room_id):
             yield result
 
@@ -107,10 +118,10 @@ class Matrix_Admin_Plugin(
         self,
         event: AstrMessageEvent,
         user: str,
-        reason: str = "",
-        room_id: str = "",
+        reason_or_room: GreedyStr = "",
     ):
         """封禁用户"""
+        reason, room_id = self._split_reason_and_room_id(reason_or_room)
         async for result in self.cmd_ban(event, user, reason, room_id):
             yield result
 
