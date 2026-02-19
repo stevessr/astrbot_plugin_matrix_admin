@@ -64,7 +64,8 @@ class Matrix_Admin_Plugin(
                 meta = platform.meta()
             except Exception:
                 continue
-            if getattr(meta, "name", "") != "matrix":
+            meta_name = str(getattr(meta, "name", "") or "").strip().lower()
+            if meta_name != "matrix":
                 continue
             e2ee_manager = getattr(platform, "e2ee_manager", None)
             verification = (
@@ -344,7 +345,7 @@ class Matrix_Admin_Plugin(
     @filter.permission_type(PermissionType.ADMIN)
     async def admin_verify(self, event: AstrMessageEvent, device_id: str):
         """手动确认 SAS 验证（需要配置 matrix_admin_verify_room_id）"""
-        if event.get_platform_name() != "matrix":
+        if str(event.get_platform_name() or "").strip().lower() != "matrix":
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
@@ -369,7 +370,9 @@ class Matrix_Admin_Plugin(
                     meta = platform.meta()
                 except Exception:
                     continue
-                if getattr(meta, "name", "") == "matrix" and str(
+                if str(
+                    getattr(meta, "name", "") or ""
+                ).strip().lower() == "matrix" and str(
                     getattr(meta, "id", "") or ""
                 ) == str(event.get_platform_id() or ""):
                     e2ee_manager = getattr(platform, "e2ee_manager", None)

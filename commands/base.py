@@ -19,7 +19,8 @@ class AdminCommandMixin:
 
     def _get_matrix_client(self, event: AstrMessageEvent):
         """获取 Matrix 客户端实例"""
-        if event.get_platform_name() != "matrix":
+        platform_name = str(event.get_platform_name() or "").strip().lower()
+        if platform_name != "matrix":
             return None
 
         try:
@@ -41,7 +42,8 @@ class AdminCommandMixin:
                     meta = platform.meta()
                 except Exception:
                     continue
-                if getattr(meta, "name", "") != "matrix":
+                meta_name = str(getattr(meta, "name", "") or "").strip().lower()
+                if meta_name != "matrix":
                     continue
                 client = getattr(platform, "client", None)
                 if client is None:
