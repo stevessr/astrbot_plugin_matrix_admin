@@ -31,7 +31,10 @@ class UserCommandsMixin(AdminCommandMixin):
             yield event.plain_result("无效的用户 ID")
             return
 
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
 
         try:
             await client.kick_user(room_id, user_id, reason or None)
@@ -62,7 +65,10 @@ class UserCommandsMixin(AdminCommandMixin):
             yield event.plain_result("无效的用户 ID")
             return
 
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
 
         try:
             await client.ban_user(room_id, user_id, reason or None)
@@ -92,7 +98,10 @@ class UserCommandsMixin(AdminCommandMixin):
             yield event.plain_result("无效的用户 ID")
             return
 
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
 
         try:
             await client.unban_user(room_id, user_id)
@@ -119,7 +128,10 @@ class UserCommandsMixin(AdminCommandMixin):
             yield event.plain_result("无效的用户 ID")
             return
 
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
 
         try:
             await client.invite_user(room_id, user_id)

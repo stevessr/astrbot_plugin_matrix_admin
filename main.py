@@ -49,7 +49,10 @@ class Matrix_Admin_Plugin(
             return
         get_insts = getattr(platform_manager, "get_insts", None)
         if callable(get_insts):
-            platforms = get_insts()
+            try:
+                platforms = get_insts()
+            except Exception:
+                platforms = getattr(platform_manager, "platform_insts", [])
         else:
             platforms = getattr(platform_manager, "platform_insts", [])
         for platform in platforms:
@@ -320,12 +323,21 @@ class Matrix_Admin_Plugin(
                 return
             get_insts = getattr(platform_manager, "get_insts", None)
             if callable(get_insts):
-                platforms = get_insts()
+                try:
+                    platforms = get_insts()
+                except Exception:
+                    platforms = getattr(platform_manager, "platform_insts", [])
             else:
                 platforms = getattr(platform_manager, "platform_insts", [])
             for platform in platforms:
-                meta = platform.meta()
-                if meta.name == "matrix" and meta.id == event.get_platform_id():
+                try:
+                    meta = platform.meta()
+                except Exception:
+                    continue
+                if (
+                    getattr(meta, "name", "") == "matrix"
+                    and str(getattr(meta, "id", "") or "") == str(event.get_platform_id() or "")
+                ):
                     e2ee_manager = getattr(platform, "e2ee_manager", None)
                     break
         except Exception as e:

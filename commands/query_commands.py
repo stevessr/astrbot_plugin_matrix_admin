@@ -30,7 +30,10 @@ class QueryCommandsMixin(AdminCommandMixin):
             yield event.plain_result("无效的用户 ID")
             return
 
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
 
         try:
             # 获取用户资料

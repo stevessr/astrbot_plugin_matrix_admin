@@ -35,7 +35,10 @@ class PowerCommandsMixin(AdminCommandMixin):
             yield event.plain_result("无效的用户 ID")
             return
 
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
 
         level_map = {
             "mod": 50,
@@ -74,7 +77,10 @@ class PowerCommandsMixin(AdminCommandMixin):
             yield event.plain_result("无效的用户 ID")
             return
 
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
 
         try:
             await client.set_user_power_level(room_id, user_id, 0)
@@ -106,7 +112,10 @@ class PowerCommandsMixin(AdminCommandMixin):
             yield event.plain_result("无效的用户 ID")
             return
 
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
 
         try:
             await client.set_user_power_level(room_id, user_id, level)
@@ -125,7 +134,10 @@ class PowerCommandsMixin(AdminCommandMixin):
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
 
         try:
             power_levels = await client.get_power_levels(room_id)

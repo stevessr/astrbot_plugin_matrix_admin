@@ -26,16 +26,32 @@ class AdminCommandMixin:
             platform_manager = getattr(self.context, "platform_manager", None)
             if platform_manager is None:
                 return None
+            target_platform_id = str(event.get_platform_id() or "")
             get_insts = getattr(platform_manager, "get_insts", None)
             if callable(get_insts):
-                platforms = get_insts()
+                try:
+                    platforms = get_insts()
+                except Exception:
+                    platforms = getattr(platform_manager, "platform_insts", [])
             else:
                 platforms = getattr(platform_manager, "platform_insts", [])
+            fallback_client = None
             for platform in platforms:
-                meta = platform.meta()
-                if meta.name == "matrix" and meta.id == event.get_platform_id():
-                    if hasattr(platform, "client"):
-                        return platform.client
+                try:
+                    meta = platform.meta()
+                except Exception:
+                    continue
+                if getattr(meta, "name", "") != "matrix":
+                    continue
+                client = getattr(platform, "client", None)
+                if client is None:
+                    continue
+                platform_id = str(getattr(meta, "id", "") or "")
+                if target_platform_id and platform_id == target_platform_id:
+                    return client
+                if fallback_client is None:
+                    fallback_client = client
+            return fallback_client
         except Exception as e:
             logger.debug(f"获取 Matrix 客户端失败：{e}")
 
@@ -60,3 +76,8 @@ class AdminCommandMixin:
                 return f"@{user_input}:{server}"
 
         return None
+
+    @staticmethod
+    def _resolve_event_room_id(event: AstrMessageEvent) -> str | None:
+        room_id = str(event.get_session_id() or "").strip()
+        return room_id or None

@@ -27,6 +27,13 @@ class RoomCommandsMixin(AdminCommandMixin):
             return f"{alias}:{server}"
         return None
 
+    @staticmethod
+    def _resolve_target_room(event: AstrMessageEvent, room_id: str = "") -> str | None:
+        if isinstance(room_id, str) and room_id.strip():
+            return room_id.strip()
+        session_room = str(event.get_session_id() or "").strip()
+        return session_room or None
+
     async def cmd_createroom(
         self,
         event: AstrMessageEvent,
@@ -98,7 +105,10 @@ class RoomCommandsMixin(AdminCommandMixin):
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
-        target_room = room_id.strip() if room_id else event.get_session_id()
+        target_room = self._resolve_target_room(event, room_id)
+        if not target_room:
+            yield event.plain_result("无法获取房间 ID")
+            return
         room_alias = self._parse_room_alias(alias, target_room)
         if not room_alias:
             yield event.plain_result("无效的别名格式")
@@ -205,7 +215,10 @@ class RoomCommandsMixin(AdminCommandMixin):
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
-        target_room = room_id.strip() if room_id else event.get_session_id()
+        target_room = self._resolve_target_room(event, room_id)
+        if not target_room:
+            yield event.plain_result("无法获取房间 ID")
+            return
         try:
             await client.forget_room(target_room)
             yield event.plain_result(f"已忘记房间：`{target_room}`")
@@ -223,7 +236,10 @@ class RoomCommandsMixin(AdminCommandMixin):
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
-        target_room = room_id.strip() if room_id else event.get_session_id()
+        target_room = self._resolve_target_room(event, room_id)
+        if not target_room:
+            yield event.plain_result("无法获取房间 ID")
+            return
         try:
             result = await client.upgrade_room(target_room, new_version)
             replacement = result.get("replacement_room", "未知")
@@ -246,7 +262,10 @@ class RoomCommandsMixin(AdminCommandMixin):
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
-        target_room = room_id.strip() if room_id else event.get_session_id()
+        target_room = self._resolve_target_room(event, room_id)
+        if not target_room:
+            yield event.plain_result("无法获取房间 ID")
+            return
         try:
             result = await client.get_room_hierarchy(target_room, limit=limit)
             rooms = result.get("rooms", [])
@@ -305,7 +324,7 @@ class RoomCommandsMixin(AdminCommandMixin):
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
-        target = room_id.strip() if room_id else event.get_session_id()
+        target = self._resolve_target_room(event, room_id)
         if not target:
             yield event.plain_result("无法获取房间 ID")
             return

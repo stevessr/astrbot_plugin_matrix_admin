@@ -69,7 +69,10 @@ class BotCommandsMixin(AdminCommandMixin):
             return
 
         # 获取原始消息中的引用信息
-        room_id = event.get_session_id()
+        room_id = self._resolve_event_room_id(event)
+        if not room_id:
+            yield event.plain_result("无法获取房间 ID")
+            return
         reply_event_id = None
         image_mxc_url = None
 
