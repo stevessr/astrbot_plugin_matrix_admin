@@ -357,7 +357,11 @@ class RoomCommandsMixin(AdminCommandMixin):
         async def _refresh_room(target_room: str) -> tuple[bool, str]:
             try:
                 members_resp = await client.get_room_members(target_room)
+                if not isinstance(members_resp, dict):
+                    return False, f"{target_room} 获取成员失败：返回格式无效"
                 chunk = members_resp.get("chunk", []) or []
+                if not isinstance(chunk, list):
+                    chunk = []
             except Exception as e:
                 logger.error(f"获取房间成员失败：{e}")
                 return False, f"{target_room} 获取成员失败：{e}"
@@ -365,12 +369,16 @@ class RoomCommandsMixin(AdminCommandMixin):
             members: dict[str, str] = {}
             member_avatars: dict[str, str] = {}
             for evt in chunk:
+                if not isinstance(evt, dict):
+                    continue
                 if evt.get("type") != "m.room.member":
                     continue
                 user_id = evt.get("state_key")
                 if not user_id:
                     continue
                 content = evt.get("content", {})
+                if not isinstance(content, dict):
+                    continue
                 if content.get("membership") != "join":
                     continue
                 display_name = content.get("displayname") or user_id
@@ -398,9 +406,15 @@ class RoomCommandsMixin(AdminCommandMixin):
             is_encrypted = False
             try:
                 state_events = await client.get_room_state(target_room)
+                if not isinstance(state_events, list):
+                    state_events = []
                 for evt in state_events:
+                    if not isinstance(evt, dict):
+                        continue
                     evt_type = evt.get("type")
                     content = evt.get("content", {})
+                    if not isinstance(content, dict):
+                        continue
                     if evt_type == "m.room.name":
                         room_name = content.get("name")
                     elif evt_type == "m.room.topic":
@@ -442,7 +456,11 @@ class RoomCommandsMixin(AdminCommandMixin):
             ok_count = 0
             fail_count = 0
             for room in rooms:
-                ok, _ = await _refresh_room(room)
+                room_id = str(room or "").strip()
+                if not room_id:
+                    fail_count += 1
+                    continue
+                ok, _ = await _refresh_room(room_id)
                 if ok:
                     ok_count += 1
                 else:
