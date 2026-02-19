@@ -44,7 +44,15 @@ class Matrix_Admin_Plugin(
         self._apply_admin_room_config(self.verify_room_id)
 
     def _apply_admin_room_config(self, room_id: str):
-        for platform in self.context.platform_manager.platform_insts:
+        platform_manager = getattr(self.context, "platform_manager", None)
+        if platform_manager is None:
+            return
+        get_insts = getattr(platform_manager, "get_insts", None)
+        if callable(get_insts):
+            platforms = get_insts()
+        else:
+            platforms = getattr(platform_manager, "platform_insts", [])
+        for platform in platforms:
             try:
                 meta = platform.meta()
             except Exception:
@@ -298,7 +306,7 @@ class Matrix_Admin_Plugin(
     @filter.permission_type(PermissionType.ADMIN)
     async def admin_verify(self, event: AstrMessageEvent, device_id: str):
         """手动确认 SAS 验证（需要配置 matrix_admin_verify_room_id）"""
-        if event.platform_meta.name != "matrix":
+        if event.get_platform_name() != "matrix":
             yield event.plain_result("此命令仅在 Matrix 平台可用")
             return
 
@@ -306,7 +314,16 @@ class Matrix_Admin_Plugin(
 
         e2ee_manager = None
         try:
-            for platform in self.context.platform_manager.platform_insts:
+            platform_manager = getattr(self.context, "platform_manager", None)
+            if platform_manager is None:
+                yield event.plain_result("获取适配器失败：platform manager 不可用")
+                return
+            get_insts = getattr(platform_manager, "get_insts", None)
+            if callable(get_insts):
+                platforms = get_insts()
+            else:
+                platforms = getattr(platform_manager, "platform_insts", [])
+            for platform in platforms:
                 meta = platform.meta()
                 if meta.name == "matrix" and meta.id == event.get_platform_id():
                     e2ee_manager = getattr(platform, "e2ee_manager", None)

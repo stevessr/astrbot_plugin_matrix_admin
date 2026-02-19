@@ -23,7 +23,15 @@ class AdminCommandMixin:
             return None
 
         try:
-            for platform in self.context.platform_manager.platform_insts:
+            platform_manager = getattr(self.context, "platform_manager", None)
+            if platform_manager is None:
+                return None
+            get_insts = getattr(platform_manager, "get_insts", None)
+            if callable(get_insts):
+                platforms = get_insts()
+            else:
+                platforms = getattr(platform_manager, "platform_insts", [])
+            for platform in platforms:
                 meta = platform.meta()
                 if meta.name == "matrix" and meta.id == event.get_platform_id():
                     if hasattr(platform, "client"):
