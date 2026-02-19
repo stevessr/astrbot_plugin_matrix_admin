@@ -3,6 +3,8 @@ Matrix Admin Plugin - Room Commands
 房间管理相关命令
 """
 
+import re
+
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 
@@ -11,6 +13,91 @@ from .base import AdminCommandMixin
 
 class RoomCommandsMixin(AdminCommandMixin):
     """房间管理命令：createroom, dm, alias, publicrooms, forget, upgrade, hierarchy, knock"""
+
+    _ROOM_ID_RE = re.compile(r"^![^\s:]+:[^\s:]+$")
+
+    @classmethod
+    def _is_valid_room_id(cls, room_id: str) -> bool:
+        text = str(room_id or "").strip()
+        return bool(cls._ROOM_ID_RE.match(text))
+
+    async def _get_room_power_context(
+        self,
+        client,
+        room_id: str,
+    ) -> tuple[int | None, int | None]:
+        """返回 (bot_power, required_state_default)，失败时返回 (None, None)。"""
+        try:
+            power_levels = await client.get_power_levels(room_id)
+        except Exception:
+            return None, None
+
+        if not isinstance(power_levels, dict):
+            return None, None
+
+        users = power_levels.get("users", {})
+        if not isinstance(users, dict):
+            users = {}
+
+        bot_user_id = str(getattr(client, "user_id", "") or "")
+        users_default = power_levels.get("users_default", 0)
+        try:
+            users_default = int(users_default)
+        except (TypeError, ValueError):
+            users_default = 0
+
+        bot_power_raw = users.get(bot_user_id, users_default)
+        try:
+            bot_power = int(bot_power_raw)
+        except (TypeError, ValueError):
+            bot_power = users_default
+
+        state_default = power_levels.get("state_default", 50)
+        try:
+            required_state_default = int(state_default)
+        except (TypeError, ValueError):
+            required_state_default = 50
+
+        return bot_power, required_state_default
+
+    async def _ensure_state_event_permission(
+        self,
+        client,
+        room_id: str,
+        event_type: str,
+    ) -> tuple[bool, str]:
+        """检查机器人在房间内发送指定 state event 的权限。"""
+        bot_power, required_default = await self._get_room_power_context(client, room_id)
+        if bot_power is None or required_default is None:
+            return True, ""
+
+        try:
+            power_levels = await client.get_power_levels(room_id)
+        except Exception:
+            power_levels = {}
+        if not isinstance(power_levels, dict):
+            power_levels = {}
+
+        events = power_levels.get("events", {})
+        if not isinstance(events, dict):
+            events = {}
+
+        required = events.get(event_type, required_default)
+        try:
+            required_level = int(required)
+        except (TypeError, ValueError):
+            required_level = required_default
+
+        if bot_power < required_level:
+            return (
+                False,
+                (
+                    f"权限不足：机器人在房间 `{room_id}` 的 power level 为 {bot_power}，"
+                    f"修改 `{event_type}` 需要 >= {required_level}"
+                ),
+            )
+
+        return True, ""
 
     def _parse_room_alias(
         self,
@@ -352,12 +439,12 @@ class RoomCommandsMixin(AdminCommandMixin):
             return
 
         topic_text = str(topic or "").strip()
-        public = str(is_public or "").strip().lower() in (
-            "yes",
-            "true",
-            "1",
-            "public",
-        )
+        normalized_public = str(is_public or "").strip().lower()
+        valid_public_values = {"yes", "true", "1", "public", "no", "false", "0", "private", ""}
+        if normalized_public not in valid_public_values:
+            yield event.plain_result("is_public 参数无效，请使用 yes/no")
+            return
+        public = normalized_public in ("yes", "true", "1", "public")
 
         try:
             result = await client.create_room(
@@ -404,6 +491,30 @@ class RoomCommandsMixin(AdminCommandMixin):
         if not space_id or not child_room_id:
             yield event.plain_result("space_id 和 child_room_id 不能为空")
             return
+        if not self._is_valid_room_id(space_id):
+            yield event.plain_result("space_id 格式无效，应为 !room:server")
+            return
+        if not self._is_valid_room_id(child_room_id):
+            yield event.plain_result("child_room_id 格式无效，应为 !room:server")
+            return
+
+        ok, permission_message = await self._ensure_state_event_permission(
+            client,
+            space_id,
+            "m.space.child",
+        )
+        if not ok:
+            yield event.plain_result(permission_message)
+            return
+
+        ok, permission_message = await self._ensure_state_event_permission(
+            client,
+            child_room_id,
+            "m.space.parent",
+        )
+        if not ok:
+            yield event.plain_result(permission_message)
+            return
 
         server_name = self._resolve_server_name(event, child_room_id)
         if not server_name:
@@ -416,6 +527,8 @@ class RoomCommandsMixin(AdminCommandMixin):
             "on",
         )
 
+        parent_content = {"via": [server_name]} if server_name else {"via": []}
+
         try:
             await client.set_room_state_event(
                 room_id=space_id,
@@ -423,8 +536,14 @@ class RoomCommandsMixin(AdminCommandMixin):
                 content=content,
                 state_key=child_room_id,
             )
+            await client.set_room_state_event(
+                room_id=child_room_id,
+                event_type="m.space.parent",
+                content=parent_content,
+                state_key=space_id,
+            )
             yield event.plain_result(
-                f"已将房间 `{child_room_id}` 挂载到 Space `{space_id}`"
+                f"已将房间 `{child_room_id}` 挂载到 Space `{space_id}`（child/parent 已同步）"
             )
         except Exception as e:
             logger.error(f"Space 挂载失败：{e}")
@@ -450,6 +569,30 @@ class RoomCommandsMixin(AdminCommandMixin):
         if not space_id or not child_room_id:
             yield event.plain_result("space_id 和 child_room_id 不能为空")
             return
+        if not self._is_valid_room_id(space_id):
+            yield event.plain_result("space_id 格式无效，应为 !room:server")
+            return
+        if not self._is_valid_room_id(child_room_id):
+            yield event.plain_result("child_room_id 格式无效，应为 !room:server")
+            return
+
+        ok, permission_message = await self._ensure_state_event_permission(
+            client,
+            space_id,
+            "m.space.child",
+        )
+        if not ok:
+            yield event.plain_result(permission_message)
+            return
+
+        ok, permission_message = await self._ensure_state_event_permission(
+            client,
+            child_room_id,
+            "m.space.parent",
+        )
+        if not ok:
+            yield event.plain_result(permission_message)
+            return
 
         try:
             await client.set_room_state_event(
@@ -458,8 +601,14 @@ class RoomCommandsMixin(AdminCommandMixin):
                 content={},
                 state_key=child_room_id,
             )
+            await client.set_room_state_event(
+                room_id=child_room_id,
+                event_type="m.space.parent",
+                content={},
+                state_key=space_id,
+            )
             yield event.plain_result(
-                f"已从 Space `{space_id}` 移除子房间 `{child_room_id}`"
+                f"已从 Space `{space_id}` 移除子房间 `{child_room_id}`（child/parent 已同步）"
             )
         except Exception as e:
             logger.error(f"Space 解绑失败：{e}")
@@ -483,6 +632,9 @@ class RoomCommandsMixin(AdminCommandMixin):
         space_id = str(space_id or "").strip()
         if not space_id:
             yield event.plain_result("space_id 不能为空")
+            return
+        if not self._is_valid_room_id(space_id):
+            yield event.plain_result("space_id 格式无效，应为 !room:server")
             return
 
         try:
