@@ -145,7 +145,15 @@ class RoomCommandsMixin(AdminCommandMixin):
                 f"无法读取房间 `{normalized_room_id}` 的创建事件内容",
             )
 
-        room_type = str(create_event.get("type", "") or "").strip()
+        # 兼容不同客户端返回格式：
+        # 1) 直接返回 m.room.create 的 content
+        # 2) 返回完整事件对象（含 content 字段）
+        create_content = create_event.get("content")
+        if isinstance(create_content, dict):
+            room_type = str(create_content.get("type", "") or "").strip()
+        else:
+            room_type = str(create_event.get("type", "") or "").strip()
+
         if room_type != "m.space":
             display_type = room_type or "(未设置)"
             return (
