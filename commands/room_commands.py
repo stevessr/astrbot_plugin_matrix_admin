@@ -78,7 +78,9 @@ class RoomCommandsMixin(AdminCommandMixin):
         event_type: str,
     ) -> tuple[bool, str]:
         """检查机器人在房间内发送指定 state event 的权限。"""
-        bot_power, required_default = await self._get_room_power_context(client, room_id)
+        bot_power, required_default = await self._get_room_power_context(
+            client, room_id
+        )
         if bot_power is None or required_default is None:
             return (
                 False,
@@ -110,6 +112,46 @@ class RoomCommandsMixin(AdminCommandMixin):
                 (
                     f"权限不足：机器人在房间 `{room_id}` 的 power level 为 {bot_power}，"
                     f"修改 `{event_type}` 需要 >= {required_level}"
+                ),
+            )
+
+        return True, ""
+
+    async def _ensure_space_room(self, client, room_id: str) -> tuple[bool, str]:
+        """确认 room_id 是 Matrix Space（m.room.create.type == m.space）。"""
+        normalized_room_id = str(room_id or "").strip()
+        if not normalized_room_id:
+            return False, "space_id 不能为空"
+
+        try:
+            create_event = await client.get_room_state_event(
+                normalized_room_id,
+                "m.room.create",
+            )
+        except Exception as e:
+            if self._is_not_found_error(e):
+                return False, f"Space 房间不存在：`{normalized_room_id}`"
+            return (
+                False,
+                (
+                    f"无法读取房间 `{normalized_room_id}` 的创建事件，"
+                    "请确认机器人在该房间内且具备读取权限"
+                ),
+            )
+
+        if not isinstance(create_event, dict):
+            return (
+                False,
+                f"无法读取房间 `{normalized_room_id}` 的创建事件内容",
+            )
+
+        room_type = str(create_event.get("type", "") or "").strip()
+        if room_type != "m.space":
+            display_type = room_type or "(未设置)"
+            return (
+                False,
+                (
+                    f"房间 `{normalized_room_id}` 不是 Space（m.room.create.type={display_type}）"
                 ),
             )
 
@@ -456,7 +498,17 @@ class RoomCommandsMixin(AdminCommandMixin):
 
         topic_text = str(topic or "").strip()
         normalized_public = str(is_public or "").strip().lower()
-        valid_public_values = {"yes", "true", "1", "public", "no", "false", "0", "private", ""}
+        valid_public_values = {
+            "yes",
+            "true",
+            "1",
+            "public",
+            "no",
+            "false",
+            "0",
+            "private",
+            "",
+        }
         if normalized_public not in valid_public_values:
             yield event.plain_result("is_public 参数无效，请使用 yes/no")
             return
@@ -517,6 +569,11 @@ class RoomCommandsMixin(AdminCommandMixin):
             yield event.plain_result("space_id 与 child_room_id 不能相同")
             return
 
+        ok, space_message = await self._ensure_space_room(client, space_id)
+        if not ok:
+            yield event.plain_result(space_message)
+            return
+
         ok, permission_message = await self._ensure_state_event_permission(
             client,
             space_id,
@@ -546,7 +603,8 @@ class RoomCommandsMixin(AdminCommandMixin):
 
         content = {
             "via": [server_name],
-            "suggested": str(suggested or "").strip().lower() in (
+            "suggested": str(suggested or "").strip().lower()
+            in (
                 "yes",
                 "true",
                 "1",
@@ -630,6 +688,11 @@ class RoomCommandsMixin(AdminCommandMixin):
             return
         if space_id == child_room_id:
             yield event.plain_result("space_id 与 child_room_id 不能相同")
+            return
+
+        ok, space_message = await self._ensure_space_room(client, space_id)
+        if not ok:
+            yield event.plain_result(space_message)
             return
 
         ok, permission_message = await self._ensure_state_event_permission(
@@ -725,6 +788,11 @@ class RoomCommandsMixin(AdminCommandMixin):
             return
         if not self._is_valid_room_id(space_id):
             yield event.plain_result("space_id 格式无效，应为 !room:server")
+            return
+
+        ok, space_message = await self._ensure_space_room(client, space_id)
+        if not ok:
+            yield event.plain_result(space_message)
             return
 
         try:
