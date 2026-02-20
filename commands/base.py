@@ -8,8 +8,6 @@ from typing import TYPE_CHECKING
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
 
-from astrbot_plugin_matrix_adapter.utils import MatrixUtils
-
 if TYPE_CHECKING:
     from astrbot.api.star import Context
 
@@ -18,6 +16,20 @@ class AdminCommandMixin:
     """Admin 命令基类，提供共享工具方法"""
 
     context: "Context"
+    _matrix_utils_cls = None
+
+    def _get_matrix_utils_cls(self):
+        if self._matrix_utils_cls is not None:
+            return self._matrix_utils_cls
+
+        try:
+            from astrbot_plugin_matrix_adapter.utils import MatrixUtils
+        except ImportError as e:
+            logger.debug(f"导入 MatrixUtils 失败：{e}")
+            return None
+
+        self._matrix_utils_cls = MatrixUtils
+        return MatrixUtils
 
     def _get_matrix_client(self, event: AstrMessageEvent):
         """获取 Matrix 客户端实例"""
@@ -25,9 +37,13 @@ class AdminCommandMixin:
         if platform_name != "matrix":
             return None
 
+        matrix_utils_cls = self._get_matrix_utils_cls()
+        if matrix_utils_cls is None:
+            return None
+
         try:
             target_platform_id = str(event.get_platform_id() or "")
-            return MatrixUtils.get_matrix_client(self.context, target_platform_id)
+            return matrix_utils_cls.get_matrix_client(self.context, target_platform_id)
         except Exception as e:
             logger.debug(f"获取 Matrix 客户端失败：{e}")
 

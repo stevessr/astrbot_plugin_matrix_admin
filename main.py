@@ -10,8 +10,6 @@ from astrbot.api.star import Context, Star, register
 from astrbot.core.star.filter.command import GreedyStr
 from astrbot.core.star.filter.permission import PermissionType
 
-from astrbot_plugin_matrix_adapter.utils import MatrixUtils
-
 from .commands import (
     BotCommandsMixin,
     IgnoreCommandsMixin,
@@ -50,8 +48,14 @@ class Matrix_Admin_Plugin(
         self._apply_admin_room_config(self.verify_room_id)
 
     def _apply_admin_room_config(self, room_id: str):
-        e2ee_manager = MatrixUtils.get_matrix_e2ee_manager(self.context)
-        verification = getattr(e2ee_manager, "_verification", None) if e2ee_manager else None
+        matrix_utils_cls = self._get_matrix_utils_cls()
+        if matrix_utils_cls is None:
+            return
+
+        e2ee_manager = matrix_utils_cls.get_matrix_e2ee_manager(self.context)
+        verification = (
+            getattr(e2ee_manager, "_verification", None) if e2ee_manager else None
+        )
         if verification:
             verification.set_admin_notify_room(room_id)
 
@@ -387,10 +391,15 @@ class Matrix_Admin_Plugin(
 
         self._maybe_apply_admin_room_config()
 
+        matrix_utils_cls = self._get_matrix_utils_cls()
+        if matrix_utils_cls is None:
+            yield event.plain_result("未检测到 Matrix 适配器插件")
+            return
+
         e2ee_manager = None
         try:
             target_platform_id = str(event.get_platform_id() or "")
-            e2ee_manager = MatrixUtils.get_matrix_e2ee_manager(
+            e2ee_manager = matrix_utils_cls.get_matrix_e2ee_manager(
                 self.context,
                 target_platform_id,
             )
