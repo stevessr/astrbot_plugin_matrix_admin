@@ -15,11 +15,22 @@ class RoomCommandsMixin(AdminCommandMixin):
     """房间管理命令：createroom, dm, alias, publicrooms, forget, upgrade, hierarchy, knock"""
 
     _ROOM_ID_RE = re.compile(r"^![^\s:]+:[^\s:]+$")
+    _SERVER_NAME_RE = re.compile(r"^[A-Za-z0-9.-]+(?::\d{1,5})?$")
 
     @classmethod
     def _is_valid_room_id(cls, room_id: str) -> bool:
         text = str(room_id or "").strip()
         return bool(cls._ROOM_ID_RE.match(text))
+
+    @classmethod
+    def _is_valid_server_name(cls, server_name: str) -> bool:
+        normalized = str(server_name or "").strip()
+        return bool(normalized and cls._SERVER_NAME_RE.match(normalized))
+
+    @staticmethod
+    def _is_not_found_error(exc: Exception) -> bool:
+        text = str(exc or "").strip().lower()
+        return "404" in text or "not found" in text or "m_not_found" in text
 
     async def _get_room_power_context(
         self,
@@ -69,7 +80,12 @@ class RoomCommandsMixin(AdminCommandMixin):
         """检查机器人在房间内发送指定 state event 的权限。"""
         bot_power, required_default = await self._get_room_power_context(client, room_id)
         if bot_power is None or required_default is None:
-            return True, ""
+            return (
+                False,
+                (
+                    f"无法校验房间 `{room_id}` 的权限，请确认机器人在房间内并可读取 power levels"
+                ),
+            )
 
         try:
             power_levels = await client.get_power_levels(room_id)
@@ -497,6 +513,9 @@ class RoomCommandsMixin(AdminCommandMixin):
         if not self._is_valid_room_id(child_room_id):
             yield event.plain_result("child_room_id 格式无效，应为 !room:server")
             return
+        if space_id == child_room_id:
+            yield event.plain_result("space_id 与 child_room_id 不能相同")
+            return
 
         ok, permission_message = await self._ensure_state_event_permission(
             client,
@@ -519,16 +538,34 @@ class RoomCommandsMixin(AdminCommandMixin):
         server_name = self._resolve_server_name(event, child_room_id)
         if not server_name:
             server_name = self._resolve_server_name(event, space_id)
-        content = {"via": [server_name]} if server_name else {"via": []}
-        content["suggested"] = str(suggested or "").strip().lower() in (
-            "yes",
-            "true",
-            "1",
-            "on",
-        )
+        if not self._is_valid_server_name(server_name):
+            yield event.plain_result(
+                "无法确定有效的 homeserver（via），请显式使用完整 room_id 并确保机器人已登录 Matrix"
+            )
+            return
 
-        parent_content = {"via": [server_name]} if server_name else {"via": []}
+        content = {
+            "via": [server_name],
+            "suggested": str(suggested or "").strip().lower() in (
+                "yes",
+                "true",
+                "1",
+                "on",
+            ),
+        }
+        parent_content = {"via": [server_name]}
 
+        previous_child_event = None
+        try:
+            previous_child_event = await client.get_room_state_event(
+                room_id=space_id,
+                event_type="m.space.child",
+                state_key=child_room_id,
+            )
+        except Exception:
+            previous_child_event = None
+
+        child_link_created = False
         try:
             await client.set_room_state_event(
                 room_id=space_id,
@@ -536,6 +573,7 @@ class RoomCommandsMixin(AdminCommandMixin):
                 content=content,
                 state_key=child_room_id,
             )
+            child_link_created = True
             await client.set_room_state_event(
                 room_id=child_room_id,
                 event_type="m.space.parent",
@@ -546,6 +584,21 @@ class RoomCommandsMixin(AdminCommandMixin):
                 f"已将房间 `{child_room_id}` 挂载到 Space `{space_id}`（child/parent 已同步）"
             )
         except Exception as e:
+            if child_link_created:
+                rollback_content = (
+                    previous_child_event
+                    if isinstance(previous_child_event, dict) and previous_child_event
+                    else {}
+                )
+                try:
+                    await client.set_room_state_event(
+                        room_id=space_id,
+                        event_type="m.space.child",
+                        content=rollback_content,
+                        state_key=child_room_id,
+                    )
+                except Exception as rollback_error:
+                    logger.error(f"Space 挂载回滚失败：{rollback_error}")
             logger.error(f"Space 挂载失败：{e}")
             yield event.plain_result(f"Space 挂载失败：{e}")
 
@@ -575,6 +628,9 @@ class RoomCommandsMixin(AdminCommandMixin):
         if not self._is_valid_room_id(child_room_id):
             yield event.plain_result("child_room_id 格式无效，应为 !room:server")
             return
+        if space_id == child_room_id:
+            yield event.plain_result("space_id 与 child_room_id 不能相同")
+            return
 
         ok, permission_message = await self._ensure_state_event_permission(
             client,
@@ -594,6 +650,17 @@ class RoomCommandsMixin(AdminCommandMixin):
             yield event.plain_result(permission_message)
             return
 
+        previous_child_event = None
+        try:
+            previous_child_event = await client.get_room_state_event(
+                room_id=space_id,
+                event_type="m.space.child",
+                state_key=child_room_id,
+            )
+        except Exception:
+            previous_child_event = None
+
+        child_link_removed = False
         try:
             await client.set_room_state_event(
                 room_id=space_id,
@@ -601,6 +668,7 @@ class RoomCommandsMixin(AdminCommandMixin):
                 content={},
                 state_key=child_room_id,
             )
+            child_link_removed = True
             await client.set_room_state_event(
                 room_id=child_room_id,
                 event_type="m.space.parent",
@@ -611,6 +679,28 @@ class RoomCommandsMixin(AdminCommandMixin):
                 f"已从 Space `{space_id}` 移除子房间 `{child_room_id}`（child/parent 已同步）"
             )
         except Exception as e:
+            if child_link_removed and not self._is_not_found_error(e):
+                rollback_content = (
+                    previous_child_event
+                    if isinstance(previous_child_event, dict) and previous_child_event
+                    else None
+                )
+                if rollback_content is None:
+                    server_name = self._resolve_server_name(event, child_room_id)
+                    if not server_name:
+                        server_name = self._resolve_server_name(event, space_id)
+                    if self._is_valid_server_name(server_name):
+                        rollback_content = {"via": [server_name], "suggested": True}
+                if rollback_content is not None:
+                    try:
+                        await client.set_room_state_event(
+                            room_id=space_id,
+                            event_type="m.space.child",
+                            content=rollback_content,
+                            state_key=child_room_id,
+                        )
+                    except Exception as rollback_error:
+                        logger.error(f"Space 解绑回滚失败：{rollback_error}")
             logger.error(f"Space 解绑失败：{e}")
             yield event.plain_result(f"Space 解绑失败：{e}")
 
@@ -638,24 +728,48 @@ class RoomCommandsMixin(AdminCommandMixin):
             return
 
         try:
-            normalized_limit = max(1, min(int(limit), 100))
+            requested_limit = max(1, min(int(limit), 500))
         except (TypeError, ValueError):
-            normalized_limit = 20
+            requested_limit = 20
+
+        page_size = min(requested_limit, 100)
+        next_token = None
+        rooms: list[dict] = []
+        room_ids: set[str] = set()
 
         try:
-            result = await client.get_room_hierarchy(space_id, limit=normalized_limit)
-            rooms = result.get("rooms", [])
+            while len(rooms) < requested_limit:
+                request_kwargs = {"limit": page_size}
+                if next_token:
+                    request_kwargs["from_token"] = next_token
+                result = await client.get_room_hierarchy(space_id, **request_kwargs)
+                page_rooms = result.get("rooms", [])
+                for room in page_rooms:
+                    if not isinstance(room, dict):
+                        continue
+                    rid = str(room.get("room_id", "") or "")
+                    if rid and rid in room_ids:
+                        continue
+                    if rid:
+                        room_ids.add(rid)
+                    rooms.append(room)
+                    if len(rooms) >= requested_limit:
+                        break
+                next_token = result.get("next_batch")
+                if not next_token or not page_rooms:
+                    break
+
             if not rooms:
                 yield event.plain_result("该 Space 下暂无子房间")
                 return
 
-            lines = [f"Space `{space_id}` 子房间："]
+            lines = [f"Space `{space_id}` 子房间（显示 {len(rooms)} 项）："]
             for room in rooms:
-                if not isinstance(room, dict):
-                    continue
                 name = room.get("name") or room.get("canonical_alias") or "未命名"
                 rid = room.get("room_id", "未知")
                 lines.append(f"- {name} ({rid})")
+            if next_token and len(rooms) >= requested_limit:
+                lines.append("- ...（仍有更多子房间，调大 limit 可查看更多）")
             yield event.plain_result("\n".join(lines))
         except Exception as e:
             logger.error(f"获取 Space 子房间失败：{e}")
