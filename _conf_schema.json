@@ -1,8 +1,31 @@
 {
+  "matrix_admin_verify_temple_list": {
+    "description": "按适配器配置验证通知房间列表",
+    "type": "template_list",
+    "hint": "每项包含 adapter_name + rooms（逗号分隔或数组），手动 SAS 验证会向匹配适配器的所有房间推送通知",
+    "default": [],
+    "templates": {
+      "matrix_adapter_rooms": {
+        "name": "Matrix Adapter Rooms",
+        "items": {
+          "adapter_name": {
+            "description": "适配器名称",
+            "type": "string",
+            "default": ""
+          },
+          "rooms": {
+            "description": "通知房间列表",
+            "type": "list",
+            "default": []
+          }
+        }
+      }
+    }
+  },
   "matrix_admin_verify_room_id": {
-    "description": "管理员验证通知房间",
+    "description": "管理员验证通知房间（兜底）",
     "type": "string",
-    "hint": "Matrix 管理员验证通知房间 ID（用于 /admin verify 手动确认 SAS）",
+    "hint": "旧版单房间配置，temple_list 未命中时作为兜底目标",
     "default": ""
   }
 }
