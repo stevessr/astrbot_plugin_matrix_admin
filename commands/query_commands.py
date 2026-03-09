@@ -102,18 +102,21 @@ class QueryCommandsMixin(AdminCommandMixin):
                 yield event.plain_result(f"未找到匹配 '{keyword}' 的用户")
                 return
 
-            lines = [f"**搜索结果 ({len(users)} 个用户):**\n"]
-            for user in users:
+            lines = [f"用户搜索结果：{keyword}（共 {len(users)} 个）", ""]
+            for index, user in enumerate(users, start=1):
                 if not isinstance(user, dict):
                     continue
-                uid = user.get("user_id", "未知")
-                name = user.get("display_name", "")
-                if name:
-                    lines.append(f"- {name} (`{uid}`)")
+                uid = str(user.get("user_id", "未知") or "未知")
+                name = str(user.get("display_name", "") or "").strip()
+                if name and name != uid:
+                    lines.append(f"{index}. {name}")
+                    lines.append(f"   User ID: {uid}")
                 else:
-                    lines.append(f"- `{uid}`")
+                    lines.append(f"{index}. {uid}")
+                lines.append("")
 
-            yield event.plain_result("\n".join(lines))
+            lines.append("可使用 /admin whois <user_id> 查询详情。")
+            yield event.plain_result("\n".join(lines).rstrip())
 
         except Exception as e:
             logger.error(f"搜索用户失败：{e}")
