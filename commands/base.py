@@ -31,6 +31,73 @@ class AdminCommandMixin:
         self._matrix_utils_cls = MatrixUtils
         return MatrixUtils
 
+    def _resolve_matrix_platform(
+        self, event: AstrMessageEvent, matrix_platform_id: str = ""
+    ):
+        matrix_utils_cls = self._get_matrix_utils_cls()
+        if matrix_utils_cls is None:
+            return None, "未检测到 Matrix 适配器插件"
+
+        requested_platform_id = str(matrix_platform_id or "").strip()
+        current_platform_name = str(event.get_platform_name() or "").strip().lower()
+        current_platform_id = str(event.get_platform_id() or "")
+
+        target_platform_id = requested_platform_id
+        if not target_platform_id and current_platform_name == "matrix":
+            target_platform_id = current_platform_id
+
+        if not target_platform_id and current_platform_name != "matrix":
+            matrix_platform_ids = matrix_utils_cls.list_matrix_platform_ids(
+                self.context
+            )
+            if not matrix_platform_ids:
+                return None, "未检测到可用的 Matrix 适配器"
+            if len(matrix_platform_ids) > 1:
+                return None, (
+                    "检测到多个 Matrix 适配器，请在命令末尾指定 matrix_platform_id：\n"
+                    + "\n".join(
+                        f"- {platform_id}" for platform_id in matrix_platform_ids
+                    )
+                )
+            target_platform_id = matrix_platform_ids[0]
+
+        platform = matrix_utils_cls.get_matrix_platform(
+            self.context,
+            target_platform_id,
+            fallback_to_first=not bool(target_platform_id),
+        )
+        if platform is None:
+            return None, "指定的 Matrix 适配器不存在或不可用"
+        return platform, None
+
+    def _resolve_matrix_e2ee_manager(
+        self,
+        event: AstrMessageEvent,
+        matrix_platform_id: str = "",
+    ):
+        platform, error = self._resolve_matrix_platform(event, matrix_platform_id)
+        if error:
+            return None, error
+
+        e2ee_manager = getattr(platform, "e2ee_manager", None)
+        if not e2ee_manager:
+            return None, "端到端加密未启用、不可用，或指定的 Matrix 适配器不存在"
+        return e2ee_manager, None
+
+    @staticmethod
+    def _get_event_e2ee_manager(event: AstrMessageEvent):
+        try:
+            message_obj = getattr(event, "message_obj", None)
+            if message_obj:
+                raw_message = getattr(message_obj, "raw_message", None)
+                if raw_message:
+                    adapter = getattr(raw_message, "_adapter", None)
+                    if adapter:
+                        return getattr(adapter, "e2ee_manager", None)
+        except Exception as exc:
+            logger.debug(f"获取 e2ee_manager 失败：{exc}")
+        return None
+
     def _get_matrix_client(self, event: AstrMessageEvent):
         """获取 Matrix 客户端实例"""
         platform_name = str(event.get_platform_name() or "").strip().lower()

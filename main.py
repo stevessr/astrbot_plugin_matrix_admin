@@ -2,7 +2,7 @@
 Matrix Admin Plugin - 提供 Matrix 房间管理命令
 
 此插件依赖于 astrbot_plugin_matrix_adapter 提供的 Matrix 客户端。
-提供用户管理、权限控制、房间管理等功能。
+提供用户管理、权限控制、房间管理及适配器运维命令。
 """
 
 from astrbot.api.event import AstrMessageEvent, filter
@@ -16,6 +16,7 @@ from .commands import (
     PowerCommandsMixin,
     QueryCommandsMixin,
     RoomCommandsMixin,
+    RuntimeCommandsMixin,
     UserCommandsMixin,
 )
 from .tool import (
@@ -28,8 +29,8 @@ from .tool import (
 @register(
     "astrbot_plugin_matrix_admin",
     "stevessr",
-    "Matrix 房间管理插件，提供用户管理、权限控制、封禁踢出等管理命令",
-    "0.1.0",
+    "Matrix 管理插件，提供房间管理、设备验证与适配器运维命令",
+    "0.2.0",
 )
 class Matrix_Admin_Plugin(
     Star,
@@ -39,6 +40,7 @@ class Matrix_Admin_Plugin(
     IgnoreCommandsMixin,
     RoomCommandsMixin,
     BotCommandsMixin,
+    RuntimeCommandsMixin,
 ):
     def __init__(self, context: Context, config: dict | None = None) -> None:
         super().__init__(context, config)
@@ -365,6 +367,60 @@ class Matrix_Admin_Plugin(
     ):
         """清理机器人历史消息"""
         async for result in self.cmd_purge_bot_messages(event, limit, room_id):
+            yield result
+
+    @admin_group.command("scanqr")
+    @filter.permission_type(PermissionType.ADMIN)
+    async def admin_scanqr(
+        self,
+        event: AstrMessageEvent,
+        user_id: str,
+        device_id: str,
+        qr_input: str,
+        matrix_platform_id: str = "",
+    ):
+        """扫描 Matrix 设备验证二维码。"""
+        async for result in self.cmd_scanqr(
+            event,
+            user_id,
+            device_id,
+            qr_input,
+            matrix_platform_id,
+        ):
+            yield result
+
+    @admin_group.command("matrixstatus")
+    @filter.permission_type(PermissionType.ADMIN)
+    async def admin_matrixstatus(
+        self,
+        event: AstrMessageEvent,
+        matrix_platform_id: str = "",
+    ):
+        """查看 Matrix 适配器运行状态。"""
+        async for result in self.cmd_matrixstatus(event, matrix_platform_id):
+            yield result
+
+    @admin_group.command("reconnect")
+    @filter.permission_type(PermissionType.ADMIN)
+    async def admin_reconnect(
+        self,
+        event: AstrMessageEvent,
+        matrix_platform_id: str = "",
+    ):
+        """主动中断当前 /sync 长轮询并立即重连。"""
+        async for result in self.cmd_reconnect(event, matrix_platform_id):
+            yield result
+
+    @admin_group.command("resendpending")
+    @filter.permission_type(PermissionType.ADMIN)
+    async def admin_resendpending(
+        self,
+        event: AstrMessageEvent,
+        matrix_platform_id: str = "",
+        limit: str = "20",
+    ):
+        """重试最近失败或挂起的出站消息记录。"""
+        async for result in self.cmd_resendpending(event, matrix_platform_id, limit):
             yield result
 
     @admin_group.command("verify")
