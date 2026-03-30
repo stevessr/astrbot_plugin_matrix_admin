@@ -31,6 +31,36 @@ class AdminCommandMixin:
         self._matrix_utils_cls = MatrixUtils
         return MatrixUtils
 
+    def _find_matrix_platform_by_selector(self, selector: str):
+        matrix_utils_cls = self._get_matrix_utils_cls()
+        if matrix_utils_cls is None:
+            return None
+
+        normalized_selector = str(selector or "").strip()
+        if not normalized_selector:
+            return None
+
+        for platform in matrix_utils_cls.iter_platform_instances(self.context):
+            try:
+                meta = platform.meta()
+            except Exception:
+                continue
+
+            meta_name = str(getattr(meta, "name", "") or "").strip().lower()
+            if meta_name != "matrix":
+                continue
+
+            config = getattr(platform, "config", {})
+            if not isinstance(config, dict):
+                config = {}
+
+            meta_id = str(getattr(meta, "id", "") or "").strip()
+            webhook_uuid = str(config.get("webhook_uuid") or "").strip()
+            if normalized_selector in {meta_id, webhook_uuid}:
+                return platform
+
+        return None
+
     def _resolve_matrix_platform(
         self, event: AstrMessageEvent, matrix_platform_id: str = ""
     ):
@@ -40,31 +70,38 @@ class AdminCommandMixin:
 
         requested_platform_id = str(matrix_platform_id or "").strip()
         current_platform_name = str(event.get_platform_name() or "").strip().lower()
-        current_platform_id = str(event.get_platform_id() or "")
+        current_platform_id = str(event.get_platform_id() or "").strip()
 
-        target_platform_id = requested_platform_id
-        if not target_platform_id and current_platform_name == "matrix":
-            target_platform_id = current_platform_id
+        if requested_platform_id:
+            platform = self._find_matrix_platform_by_selector(requested_platform_id)
+            if platform is None:
+                return None, "指定的 Matrix 适配器不存在或不可用"
+            return platform, None
 
-        if not target_platform_id and current_platform_name != "matrix":
-            matrix_platform_ids = matrix_utils_cls.list_matrix_platform_ids(
-                self.context
+        if current_platform_name == "matrix":
+            platform = self._find_matrix_platform_by_selector(current_platform_id)
+            if platform is not None:
+                return platform, None
+
+        if current_platform_id:
+            platform = self._find_matrix_platform_by_selector(current_platform_id)
+            if platform is not None:
+                return platform, None
+
+        matrix_platform_ids = matrix_utils_cls.list_matrix_platform_ids(self.context)
+        if not matrix_platform_ids:
+            return None, "未检测到可用的 Matrix 适配器"
+        if len(matrix_platform_ids) > 1:
+            return None, (
+                "检测到多个 Matrix 适配器，请在命令末尾指定 "
+                "matrix_platform_id（也可填写同 webhook 的 webhook_uuid）：\n"
+                + "\n".join(f"- {platform_id}" for platform_id in matrix_platform_ids)
             )
-            if not matrix_platform_ids:
-                return None, "未检测到可用的 Matrix 适配器"
-            if len(matrix_platform_ids) > 1:
-                return None, (
-                    "检测到多个 Matrix 适配器，请在命令末尾指定 matrix_platform_id：\n"
-                    + "\n".join(
-                        f"- {platform_id}" for platform_id in matrix_platform_ids
-                    )
-                )
-            target_platform_id = matrix_platform_ids[0]
 
         platform = matrix_utils_cls.get_matrix_platform(
             self.context,
-            target_platform_id,
-            fallback_to_first=not bool(target_platform_id),
+            matrix_platform_ids[0],
+            fallback_to_first=False,
         )
         if platform is None:
             return None, "指定的 Matrix 适配器不存在或不可用"
