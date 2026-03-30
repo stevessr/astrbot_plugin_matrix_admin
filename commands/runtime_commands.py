@@ -5,7 +5,7 @@ Matrix 适配器运行态与验证辅助命令
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
-from astrbot.core.message.components import Image
+from astrbot.core.message.components import Image, Reply
 
 from .base import AdminCommandMixin
 
@@ -20,6 +20,27 @@ class RuntimeCommandsMixin(AdminCommandMixin):
             return normalized.split(";base64,", 1)[1].strip()
         return normalized
 
+    async def _extract_qr_input_from_reply(
+        self, event: AstrMessageEvent
+    ) -> tuple[str | None, str | None]:
+        for component in event.get_messages() or []:
+            if not isinstance(component, Reply):
+                continue
+
+            reply_chain = getattr(component, "chain", None) or []
+            for reply_component in reply_chain:
+                if not isinstance(reply_component, Image):
+                    continue
+                try:
+                    payload = await reply_component.convert_to_base64()
+                    payload = self._normalize_qr_input(payload)
+                    if payload:
+                        return payload, None
+                except Exception as exc:
+                    logger.debug(f"从引用图片提取二维码载荷失败：{exc}")
+
+        return None, None
+
     async def _resolve_scan_qr_input(
         self,
         event: AstrMessageEvent,
@@ -28,6 +49,10 @@ class RuntimeCommandsMixin(AdminCommandMixin):
         normalized_input = self._normalize_qr_input(qr_input)
         if normalized_input:
             return normalized_input, None
+
+        reply_payload, _ = await self._extract_qr_input_from_reply(event)
+        if reply_payload:
+            return reply_payload, None
 
         for component in event.get_messages() or []:
             if not isinstance(component, Image):
@@ -41,7 +66,7 @@ class RuntimeCommandsMixin(AdminCommandMixin):
                 logger.debug(f"从消息图片提取二维码载荷失败：{exc}")
 
         return None, (
-            "请提供二维码图片路径、base64 载荷，或在网页消息中直接附带二维码图片"
+            "请提供二维码图片路径、base64 载荷，或在网页消息中附带/引用二维码图片"
         )
 
     async def cmd_scanqr(
