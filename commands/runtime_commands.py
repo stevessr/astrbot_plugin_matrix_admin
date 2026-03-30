@@ -5,12 +5,44 @@ Matrix 适配器运行态与验证辅助命令
 
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
+from astrbot.core.message.components import Image
 
 from .base import AdminCommandMixin
 
 
 class RuntimeCommandsMixin(AdminCommandMixin):
     """运行态命令：scanqr, matrixstatus, reconnect, resendpending"""
+
+    @staticmethod
+    def _normalize_qr_input(qr_input: str) -> str:
+        normalized = str(qr_input or "").strip()
+        if normalized.startswith("data:") and ";base64," in normalized:
+            return normalized.split(";base64,", 1)[1].strip()
+        return normalized
+
+    async def _resolve_scan_qr_input(
+        self,
+        event: AstrMessageEvent,
+        qr_input: str = "",
+    ) -> tuple[str | None, str | None]:
+        normalized_input = self._normalize_qr_input(qr_input)
+        if normalized_input:
+            return normalized_input, None
+
+        for component in event.get_messages() or []:
+            if not isinstance(component, Image):
+                continue
+            try:
+                payload = await component.convert_to_base64()
+                payload = self._normalize_qr_input(payload)
+                if payload:
+                    return payload, None
+            except Exception as exc:
+                logger.debug(f"从消息图片提取二维码载荷失败：{exc}")
+
+        return None, (
+            "请提供二维码图片路径、base64 载荷，或在网页消息中直接附带二维码图片"
+        )
 
     async def cmd_scanqr(
         self,
@@ -36,13 +68,20 @@ class RuntimeCommandsMixin(AdminCommandMixin):
             yield event.plain_result("验证模块未初始化")
             return
 
+        resolved_qr_input, input_error = await self._resolve_scan_qr_input(
+            event, qr_input
+        )
+        if input_error:
+            yield event.plain_result(input_error)
+            return
+
         scan_method = getattr(verification, "scan_qr", None)
         if not callable(scan_method):
             yield event.plain_result("当前验证模块不支持扫码验证")
             return
 
         try:
-            ok, message = await scan_method(user_id, device_id, qr_input)
+            ok, message = await scan_method(user_id, device_id, resolved_qr_input)
             prefix = "✅" if ok else "❌"
             yield event.plain_result(f"{prefix} {message}")
         except Exception as exc:

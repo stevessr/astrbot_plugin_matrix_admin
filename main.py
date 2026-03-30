@@ -376,7 +376,7 @@ class Matrix_Admin_Plugin(
         event: AstrMessageEvent,
         user_id: str,
         device_id: str,
-        qr_input: str,
+        qr_input: str = "",
         matrix_platform_id: str = "",
     ):
         """扫描 Matrix 设备验证二维码。"""
