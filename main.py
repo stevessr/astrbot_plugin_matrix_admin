@@ -53,7 +53,6 @@ class Matrix_Admin_Plugin(
             self.config.get("matrix_admin_verify_temple_list")
             or self.config.get("matrix_admin_verify_template_list")
         )
-        self._maybe_apply_admin_room_config()
 
     def _maybe_apply_admin_room_config(self):
         apply_admin_room_config(self)

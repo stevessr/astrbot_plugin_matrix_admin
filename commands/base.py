@@ -24,8 +24,7 @@ class AdminCommandMixin:
 
         try:
             from astrbot_plugin_matrix_adapter.utils import MatrixUtils
-        except ImportError as e:
-            logger.debug(f"导入 MatrixUtils 失败：{e}")
+        except ImportError:
             return None
 
         self._matrix_utils_cls = MatrixUtils
